@@ -4,7 +4,22 @@ import { useState } from 'react'
 import { FileUpload } from '@/components/file-upload'
 import { MetricCard } from '@/components/metric-card'
 import { useCompressionStore } from '@/lib/store'
-import { Download, BarChart2, Eye, EyeOff, CheckCircle2 } from 'lucide-react'
+import { 
+  Download, 
+  BarChart2, 
+  Eye, 
+  EyeOff, 
+  CheckCircle2,
+  Shuffle,
+  GitMerge,
+  Search,
+  Database,
+  GitFork,
+  GraduationCap,
+  Activity,
+  Calendar,
+  Layers
+} from 'lucide-react'
 import { HexViewer } from '@/components/hex-viewer'
 import { HuffmanTreeVisualizer } from '@/components/huffman-tree'
 import { EntropyGraph } from '@/components/entropy-graph'
@@ -12,6 +27,7 @@ import { NetworkRacer } from '@/components/network-racer'
 import { LZ77Inspector } from '@/components/lz77-inspector'
 import { EnergyMonitor } from '@/components/energy-monitor'
 import { AIRouter } from '@/components/ai-router'
+import Link from 'next/link'
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'upload' | 'settings'>('upload')
@@ -32,16 +48,11 @@ export default function Home() {
 
     setIsLoading(true)
     try {
-      // Determine if data needs to be base64 encoded (for binary files)
-      // We'll assume the file uploader sets it as base64 string or regular string.
-      // For now, if we get it from FileUpload, it's typically read as text unless handled otherwise.
-      // Let's pass it directly as text string for now.
-      
       const payload = {
         data: inputData,
         algorithms: Array.from(selectedAlgorithms),
         mode: engineMode,
-        is_base64: false // We can improve this in FileUpload to read binary
+        is_base64: false
       }
 
       const response = await fetch('http://localhost:8000/compress', {
@@ -66,11 +77,8 @@ export default function Home() {
   }
 
   const handleSelectRecommended = (algo: string) => {
-    // Clear all and select just the recommended one
     const current = new Set(selectedAlgorithms)
-    current.forEach(a => toggleAlgorithm(a)) // This turns them all off (assuming toggle toggles)
-    // Actually, toggleAlgorithm just flips. 
-    // To cleanly set, maybe we just toggle the ones that are not the algo, and ensure algo is on.
+    current.forEach(a => toggleAlgorithm(a))
     const allAlgos = ['huffman', 'lz77', 'lzw', 'rle', 'bwt', 'deflate', 'arithmetic']
     allAlgos.forEach(a => {
       if (a === algo && !selectedAlgorithms.has(a)) toggleAlgorithm(a)
@@ -138,17 +146,81 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }
 
+  const daaModules = [
+    { href: '/sorting-lab', label: 'Sorting Laboratory', desc: 'Animate Bubble, Selection, Merge, Quick, Heap, & Counting sort benchmarks.', icon: Shuffle, badge: 'Unit I & II' },
+    { href: '/mst-planner', label: 'MST Server Planner', desc: 'Construct optimal minimum-weight server trees using Kruskal\'s & Prim\'s.', icon: GitMerge, badge: 'Unit IV' },
+    { href: '/network-routing', label: 'Dijkstra Latency Router', desc: 'Find shortest transmission latency paths across edge server nodes.', icon: Activity, badge: 'Unit IV' },
+    { href: '/scheduler', label: 'Topological Scheduler', desc: 'Resolve prerequisite module order hierarchies with Kahn\'s & DFS.', icon: Calendar, badge: 'Unit II' },
+    { href: '/recursion-tree', label: 'Recursion Tree Visualizer', desc: 'Animate naive vs memoized Fibonacci call stack trees.', icon: GitFork, badge: 'Unit I & IV' },
+    { href: '/knapsack', label: 'Knapsack Allocator', desc: 'Optimize transmission values under bandwidth limits using DP vs Greedy.', icon: Database, badge: 'Unit IV' },
+    { href: '/string-matching', label: 'String Matching Lab', desc: 'Compare Naive matching alignments with Boyer-Moore & Horspool shifts.', icon: Search, badge: 'Unit III' },
+    { href: '/viva-guide', label: 'DAA Viva Sandbox', desc: 'Interactive mock oral exam questions & DP table solvers.', icon: GraduationCap, badge: 'Syllabus & Practice' },
+  ]
+
   return (
-    <div className="p-8">
+    <div className="p-8 space-y-12">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent mb-2">
-          The Compression Hub
+      <div>
+        <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent mb-3 tracking-tight">
+          DAA Algorithm Laboratory Showcase
         </h1>
-        <p className="text-muted-foreground">
-          Upload files or paste text to analyze compression algorithms and their performance characteristics.
+        <p className="text-muted-foreground text-sm max-w-2xl leading-relaxed">
+          Interactive educational environment for studying Design and Analysis of Algorithms (DAA) syllabus paradigms, time complexity parameters, and sorting/graph solvers.
         </p>
       </div>
+
+      {/* DAA Modules Grid */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold text-primary uppercase tracking-wider flex items-center gap-2">
+          <Layers className="w-5 h-5" /> Interactive Syllabus Modules
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {daaModules.map((mod, idx) => {
+            const Icon = mod.icon
+            return (
+              <Link 
+                key={idx} 
+                href={mod.href} 
+                className="bg-card/50 backdrop-blur-sm border border-border/30 rounded-lg p-5 hover:border-primary/55 transition-all flex flex-col justify-between group shadow-sm hover:shadow-md"
+              >
+                <div>
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="p-2.5 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-all text-primary">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-accent bg-accent/10 border border-accent/15 px-2 py-0.5 rounded">
+                      {mod.badge}
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-sm text-foreground mb-1.5 group-hover:text-primary transition-all">
+                    {mod.label}
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {mod.desc}
+                  </p>
+                </div>
+                <div className="text-[10px] text-accent font-bold mt-4 opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1">
+                  Launch Visualizer <span>➔</span>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="h-px bg-border/25" />
+
+      {/* Compression Workspace Section */}
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-bold text-primary uppercase tracking-wider">
+            File Compression & Entropy Engine
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Upload files or paste text to inspect lossless compression metrics and compare Shannon entropy vs actual bits/symbol limits.
+          </p>
+        </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column - Input & Settings */}
@@ -387,5 +459,6 @@ export default function Home() {
         </div>
       </div>
     </div>
-  )
+  </div>
+)
 }

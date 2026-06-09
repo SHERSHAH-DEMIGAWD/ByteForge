@@ -3,6 +3,7 @@
 import { useCompressionStore } from '@/lib/store'
 import { MetricCard } from '@/components/metric-card'
 import { ArrowRight } from 'lucide-react'
+import { HuffmanTreeBuilder } from '@/components/huffman-tree-builder'
 
 export default function HuffmanPage() {
   const results = useCompressionStore((state) => state.results)
@@ -60,31 +61,10 @@ export default function HuffmanPage() {
           {/* Right Column - Tree Visualization */}
           <div>
             <div className="bg-card/50 backdrop-blur-md border border-border/30 rounded-lg p-6">
-              <h3 className="text-lg font-bold text-primary mb-6">Huffman Tree Structure</h3>
+              <h3 className="text-lg font-bold text-primary mb-6">Huffman Tree Structure Builder</h3>
               
-              <div className="bg-background/30 rounded-lg p-8 min-h-96 flex items-center justify-center border border-border/20">
-                <div className="text-center">
-                  <div className="inline-block bg-primary/20 border border-primary/30 px-4 py-2 rounded-lg mb-4">
-                    <p className="text-accent font-bold">Root</p>
-                  </div>
-                  
-                  <div className="flex gap-8 justify-center mt-8">
-                    <div className="relative">
-                      <div className="absolute top-0 left-1/2 w-px h-8 bg-border/50" />
-                      <div className="bg-card/80 border border-border/30 px-3 py-1 rounded text-xs text-muted-foreground">
-                        Left (0)
-                      </div>
-                    </div>
-                    <div className="relative">
-                      <div className="absolute top-0 left-1/2 w-px h-8 bg-border/50" />
-                      <div className="bg-card/80 border border-border/30 px-3 py-1 rounded text-xs text-muted-foreground">
-                        Right (1)
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <p className="text-muted-foreground text-xs mt-8">Tree visualization would be rendered here with D3.js in production</p>
-                </div>
+              <div className="bg-background/30 rounded-lg p-6 border border-border/20">
+                <HuffmanTreeBuilder />
               </div>
             </div>
           </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts'
 import { Play } from 'lucide-react'
+import { useCompressionStore } from '@/lib/store'
 
 export default function VerificationPage() {
   const [selectedAlgo, setSelectedAlgo] = useState<string>('huffman')
@@ -22,46 +23,84 @@ export default function VerificationPage() {
 
   const handleProfiler = async () => {
     setProfilerRunning(true)
+    const storeInput = useCompressionStore.getState().inputData
+    const textData = storeInput || "The quick brown fox jumps over the lazy dog. ".repeat(250)
+    
+    // Create 10 sizes
+    const maxLen = Math.min(textData.length, 10000)
+    const step = Math.floor(maxLen / 10)
+    const sizes = Array.from({ length: 10 }, (_, i) => Math.max(100, (i + 1) * step))
 
-    const newData = []
-    for (let inputSize = 100; inputSize <= 10000; inputSize += 500) {
+    try {
       if (selectedAlgo === 'all') {
-        const huffmanTime = Math.max(1, ((inputSize / 1000) * Math.log2(inputSize / 1000) * 5) + (Math.random() * 3 - 1.5))
-        const lz77Time = Math.max(1, (Math.pow(inputSize / 1000, 2) * 0.5) + (Math.random() * 3 - 1.5))
-        const rleTime = Math.max(1, ((inputSize / 1000) * 2) + (Math.random() * 3 - 1.5))
-        
-        newData.push({
-          inputSize,
-          huffman: huffmanTime,
-          lz77: lz77Time,
-          rle: rleTime,
-        })
+        const [huffRes, lzRes, rleRes] = await Promise.all([
+          fetch('http://localhost:8000/batch-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ algorithm: 'huffman', data: textData, sizes })
+          }).then(r => r.json()),
+          fetch('http://localhost:8000/batch-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ algorithm: 'lz77', data: textData, sizes, mode: 'naive' }) // naive to show O(n^2) scaling!
+          }).then(r => r.json()),
+          fetch('http://localhost:8000/batch-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ algorithm: 'rle', data: textData, sizes })
+          }).then(r => r.json())
+        ])
+
+        const combined = sizes.map((size, idx) => ({
+          inputSize: size,
+          huffman: huffRes[idx]?.time || 0,
+          lz77: lzRes[idx]?.time || 0,
+          rle: rleRes[idx]?.time || 0
+        }))
+        setProfileData(combined)
       } else {
-        let baseTime = 0
-        const noise = Math.random() * 3 - 1.5
-
-        if (selectedAlgo === 'rle') {
-          baseTime = (inputSize / 1000) * 2
-        } else if (selectedAlgo === 'lz77') {
-          baseTime = Math.pow(inputSize / 1000, 2) * 0.5
-        } else if (selectedAlgo === 'huffman' || selectedAlgo === 'bwt' || selectedAlgo === 'deflate') {
-          baseTime = (inputSize / 1000) * Math.log2(inputSize / 1000) * 5
-        }
-
-        newData.push({
-          inputSize,
-          time: Math.max(1, baseTime + noise),
-          trendline: selectedAlgo === 'rle' 
-            ? (inputSize / 1000) * 2
-            : selectedAlgo === 'lz77'
-            ? Math.pow(inputSize / 1000, 2) * 0.5
-            : (inputSize / 1000) * Math.log2(inputSize / 1000) * 5
+        const response = await fetch('http://localhost:8000/batch-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            algorithm: selectedAlgo,
+            data: textData,
+            sizes,
+            mode: useCompressionStore.getState().engineMode
+          })
         })
+        if (!response.ok) {
+          throw new Error('Failed to run batch profiling')
+        }
+        const backendData = await response.json()
+        
+        // Generate trendline matching physical bounds
+        const mapped = backendData.map((d: any) => {
+          let trend = 0
+          const n = d.inputSize / 1000
+          if (selectedAlgo === 'rle') {
+            trend = n * 0.1 // linear coefficient
+          } else if (selectedAlgo === 'lz77') {
+            trend = useCompressionStore.getState().engineMode === 'naive' 
+              ? Math.pow(n, 2) * 0.5 
+              : n * 0.15
+          } else {
+            trend = n * Math.log2(n + 1) * 0.2
+          }
+          return {
+            inputSize: d.inputSize,
+            time: d.time,
+            trendline: trend
+          }
+        })
+        setProfileData(mapped)
       }
+    } catch (e: any) {
+      console.error(e)
+      alert(`Error during empirical profiling: ${e.message}`)
+    } finally {
+      setProfilerRunning(false)
     }
-
-    setProfileData(newData)
-    setProfilerRunning(false)
   }
 
   const customTooltip = ({ active, payload }: any) => {

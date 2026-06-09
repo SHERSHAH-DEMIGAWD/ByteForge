@@ -41,9 +41,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="font-sans antialiased dark">
+        <div className="math-watermark math-wm-1">O(N log N)</div>
+        <div className="math-watermark math-wm-2">Ω(V + E)</div>
         <div className="flex">
           <Sidebar />
-          <main className="flex-1 ml-64 min-h-screen">
+          <main className="flex-1 ml-64 min-h-screen relative z-10">
             {children}
           </main>
         </div>

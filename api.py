@@ -22,6 +22,15 @@ from algorithms.lzw import lzw_decompress
 from algorithms.arithmetic import arithmetic_decompress
 from utils.profiler import profile_algorithm
 
+from algorithms.string_matching import naive_search, horspool_search, boyer_moore_search
+from algorithms.knapsack import solve_01_knapsack, solve_fractional_knapsack
+from algorithms.dijkstra import solve_dijkstra
+from algorithms.topological import solve_kahns_topological, solve_dfs_topological
+
+from algorithms.sorting import quick_sort_trace, merge_sort_trace, heap_sort_trace, counting_sort_trace, bubble_sort_trace, selection_sort_trace
+from algorithms.mst import solve_kruskals, solve_prims
+from algorithms.recursion import get_fibonacci_naive_trace, get_fibonacci_memoized_trace, get_merge_sort_split_trace
+
 app = FastAPI(title="ByteForge Compression API")
 
 # Enable CORS for Next.js frontend
@@ -200,18 +209,10 @@ async def decompress_endpoint(req: DecompressRequest):
         elif algo == "bwt":
             decompressed = bwt_decompress(compressed_data)
         elif algo == "deflate":
-            # Deflate might not have implemented decompression in our basic version, let's assume it has it or we will fallback
             if not hasattr(deflate_decompress, '__call__'):
                  raise NotImplementedError("Deflate decompression not fully implemented")
-            # Wait, deflate.decompress expects codebook? Let's check deflate.py
             decompressed = deflate_decompress(compressed_data, req.metadata.get("codebook", {}))
         elif algo == "lzw":
-            # LZW compressed is a list of ints.
-            # Convert the list of integers into bytes (assuming 2 bytes per code)
-            compressed_bytes = b"".join(k.to_bytes(2, 'big') for k in compressed_data)
-            # Actually, `compressed_data` from request is base64 of bytes, which we decoded.
-            # Wait, `compressed_data` passed to decompression IS bytes.
-            # We need to turn those bytes back into a list of ints.
             codes = []
             for i in range(0, len(compressed_data), 2):
                 codes.append(int.from_bytes(compressed_data[i:i+2], 'big'))
@@ -219,7 +220,6 @@ async def decompress_endpoint(req: DecompressRequest):
         elif algo == "arithmetic":
             if not req.metadata or "prob_ranges" not in req.metadata or "total_length" not in req.metadata:
                 raise ValueError("Arithmetic requires 'prob_ranges' and 'total_length' in metadata")
-            # Prob ranges need to have keys as bytes, but json sends strings
             prob_ranges = {k.encode('utf-8') if isinstance(k, str) else bytes([int(k)]): tuple(v) for k, v in req.metadata["prob_ranges"].items()}
             decompressed = arithmetic_decompress(compressed_data, prob_ranges, req.metadata["total_length"])
         else:
@@ -231,3 +231,208 @@ async def decompress_endpoint(req: DecompressRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Decompression error: {str(e)}")
+
+class StringMatchingRequest(BaseModel):
+    text: str
+    pattern: str
+
+@app.post("/string-matching")
+async def string_matching_endpoint(req: StringMatchingRequest):
+    if not req.text or not req.pattern:
+        raise HTTPException(status_code=400, detail="Missing text or pattern")
+    
+    try:
+        naive_res = naive_search(req.text, req.pattern)
+        horspool_res = horspool_search(req.text, req.pattern)
+        bm_res = boyer_moore_search(req.text, req.pattern)
+        
+        return {
+            "naive": naive_res,
+            "horspool": horspool_res,
+            "boyer_moore": bm_res
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"String matching error: {str(e)}")
+
+class KnapsackRequest(BaseModel):
+    weights: List[int]
+    values: List[int]
+    capacity: int
+
+@app.post("/knapsack")
+async def knapsack_endpoint(req: KnapsackRequest):
+    if not req.weights or not req.values or req.capacity <= 0:
+        raise HTTPException(status_code=400, detail="Invalid inputs")
+    if len(req.weights) != len(req.values):
+        raise HTTPException(status_code=400, detail="Weights and values list size mismatch")
+        
+    try:
+        dp_res = solve_01_knapsack(req.weights, req.values, req.capacity)
+        greedy_res = solve_fractional_knapsack(req.weights, req.values, req.capacity)
+        
+        return {
+            "dp": dp_res,
+            "greedy": greedy_res
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Knapsack solver error: {str(e)}")
+
+class DijkstraRequest(BaseModel):
+    graph: Dict[str, Dict[str, int]]
+    start: str
+    end: str
+
+@app.post("/dijkstra-routing")
+async def dijkstra_endpoint(req: DijkstraRequest):
+    if not req.graph or not req.start or not req.end:
+        raise HTTPException(status_code=400, detail="Missing graph, start or end node")
+        
+    try:
+        res = solve_dijkstra(req.graph, req.start, req.end)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Dijkstra solver error: {str(e)}")
+
+class TopologicalRequest(BaseModel):
+    graph: Dict[str, List[str]]
+
+@app.post("/topological-scheduler")
+async def topological_endpoint(req: TopologicalRequest):
+    if not req.graph:
+        raise HTTPException(status_code=400, detail="Missing graph structure")
+        
+    try:
+        kahns_res = solve_kahns_topological(req.graph)
+        dfs_res = solve_dfs_topological(req.graph)
+        
+        return {
+            "kahns": kahns_res,
+            "dfs": dfs_res
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Topological sort error: {str(e)}")
+
+class BatchProfileRequest(BaseModel):
+    algorithm: str
+    data: str
+    sizes: List[int]
+    mode: str = "optimized"
+
+@app.post("/batch-profile")
+async def batch_profile_endpoint(req: BatchProfileRequest):
+    if not req.algorithm or not req.data or not req.sizes:
+        raise HTTPException(status_code=400, detail="Missing algorithm, data, or sizes")
+        
+    try:
+        raw_data = req.data.encode('utf-8')
+        results = []
+        is_opt = (req.mode == "optimized")
+        
+        # Determine the target function
+        if req.algorithm == "huffman":
+            func = huffman_compress
+        elif req.algorithm == "lz77":
+            func = lz77_opt if is_opt else lz77_naive
+        elif req.algorithm == "rle":
+            func = rle_compress
+        elif req.algorithm == "bwt":
+            # Wrap to pass optimized flag
+            def wrapped_bwt(d):
+                return bwt_compress(d, is_opt)
+            func = wrapped_bwt
+        elif req.algorithm == "deflate":
+            # Wrap to pass optimized flag
+            def wrapped_deflate(d):
+                return deflate_compress(d, is_opt)
+            func = wrapped_deflate
+        elif req.algorithm == "lzw":
+            func = lzw_compress
+        elif req.algorithm == "arithmetic":
+            func = arithmetic_compress
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported algorithm for profiling: {req.algorithm}")
+            
+        for size in req.sizes:
+            chunk = raw_data[:size]
+            if not chunk:
+                continue
+            res, t, m = profile_algorithm(func, chunk)
+            results.append({
+                "inputSize": len(chunk),
+                "time": t,
+                "memory": m
+            })
+            
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch profiling error: {str(e)}")
+
+class SortingRequest(BaseModel):
+    array: List[int]
+
+@app.post("/sorting-trace")
+async def sorting_endpoint(req: SortingRequest):
+    if not req.array:
+        raise HTTPException(status_code=400, detail="Missing array input")
+    try:
+        # Generate copies so modifications do not interfere
+        quick_res = quick_sort_trace(list(req.array))
+        merge_res = merge_sort_trace(list(req.array))
+        heap_res = heap_sort_trace(list(req.array))
+        counting_res = counting_sort_trace(list(req.array))
+        bubble_res = bubble_sort_trace(list(req.array))
+        selection_res = selection_sort_trace(list(req.array))
+        
+        return {
+            "quick": quick_res,
+            "merge": merge_res,
+            "heap": heap_res,
+            "counting": counting_res,
+            "bubble": bubble_res,
+            "selection": selection_res
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sorting trace error: {str(e)}")
+
+class MSTRequest(BaseModel):
+    graph: Dict[str, Dict[str, int]]
+    start_vertex: Optional[str] = None
+
+@app.post("/mst-trace")
+async def mst_endpoint(req: MSTRequest):
+    if not req.graph:
+        raise HTTPException(status_code=400, detail="Missing graph structure")
+    try:
+        kruskal_res = solve_kruskals(req.graph)
+        prim_res = solve_prims(req.graph, req.start_vertex)
+        return {
+            "kruskal": kruskal_res,
+            "prim": prim_res
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"MST solver error: {str(e)}")
+
+class RecursionRequest(BaseModel):
+    n: int
+    array: Optional[List[int]] = None
+
+@app.post("/recursion-trace")
+async def recursion_endpoint(req: RecursionRequest):
+    if req.n < 0 or req.n > 8:
+        raise HTTPException(status_code=400, detail="Fibonacci n must be between 0 and 8 to prevent call tree bloating")
+    try:
+        fib_naive = get_fibonacci_naive_trace(req.n)
+        fib_memo = get_fibonacci_memoized_trace(req.n)
+        
+        arr = req.array or [8, 3, 2, 9, 1]
+        merge_split = get_merge_sort_split_trace(arr)
+        
+        return {
+            "fib_naive": fib_naive,
+            "fib_memo": fib_memo,
+            "merge_split": merge_split
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Recursion trace error: {str(e)}")
+
+
