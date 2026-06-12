@@ -2,21 +2,27 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { 
-  Home, 
-  Zap, 
-  BarChart3, 
-  Code, 
-  BookOpen, 
-  Unlock, 
-  Activity, 
-  Search, 
-  Calendar, 
-  Shuffle, 
-  GitMerge, 
-  GitFork, 
+import { ThemeToggle } from './theme-toggle'
+import {
+  Home,
+  Zap,
+  BarChart3,
+  Code,
+  BookOpen,
+  Unlock,
+  Activity,
+  Search,
+  Calendar,
+  Shuffle,
+  GitMerge,
+  GitFork,
   GraduationCap,
-  Database
+  Database,
+  GitBranch,
+  Crosshair,
+  Table2,
+  Crown,
+  Grid3X3
 } from 'lucide-react'
 
 const coreLinks = [
@@ -38,6 +44,11 @@ const algoLinks = [
   { href: '/network-routing', label: 'Dijkstra Latency Router', icon: Activity },
   { href: '/scheduler', label: 'Topological Scheduler', icon: Calendar },
   { href: '/recursion-tree', label: 'Recursion Tree visualizer', icon: GitFork },
+  { href: '/bellman-ford', label: 'Bellman-Ford Lab', icon: GitBranch },
+  { href: '/astar', label: 'A* Pathfinding Grid', icon: Crosshair },
+  { href: '/lcs', label: 'LCS DP Table', icon: Table2 },
+  { href: '/nqueens', label: 'N-Queens Backtracking', icon: Crown },
+  { href: '/strassen', label: 'Strassen Multiplier', icon: Grid3X3 },
 ]
 
 const analysisLinks = [
@@ -67,11 +78,14 @@ export function Sidebar() {
   return (
     <aside className="w-64 border-r border-border bg-card/40 backdrop-blur-md fixed h-screen overflow-y-auto z-20 custom-scrollbar">
       {/* Logo */}
-      <div className="sticky top-0 p-6 border-b border-border/50 bg-card/85 backdrop-blur-md z-30">
-        <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
-          ByteForge
-        </h1>
-        <p className="text-xs text-muted-foreground mt-1">DAA Laboratory Hub</p>
+      <div className="sticky top-0 p-6 border-b border-border/50 bg-card/85 backdrop-blur-md z-30 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
+            ByteForge
+          </h1>
+          <p className="text-xs text-muted-foreground mt-1">DAA Laboratory Hub</p>
+        </div>
+        <ThemeToggle />
       </div>
 
       {/* Navigation */}

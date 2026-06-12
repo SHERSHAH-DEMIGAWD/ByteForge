@@ -12,6 +12,16 @@ export default function NetworkRoutingPage() {
     'Server_E': { 'Server_D': 2, 'Server_F': 3 },
     'Server_F': {}
   })
+
+  const [inputType, setInputType] = useState<'automatic' | 'manual'>('automatic')
+  const [jsonInput, setJsonInput] = useState<string>(JSON.stringify({
+    'Server_A': { 'Server_B': 4, 'Server_C': 2 },
+    'Server_B': { 'Server_C': 1, 'Server_D': 5 },
+    'Server_C': { 'Server_B': 1, 'Server_D': 8, 'Server_E': 10 },
+    'Server_D': { 'Server_E': 2, 'Server_F': 6 },
+    'Server_E': { 'Server_D': 2, 'Server_F': 3 },
+    'Server_F': {}
+  }, null, 2))
   
   const [startNode, setStartNode] = useState<string>('Server_A')
   const [endNode, setEndNode] = useState<string>('Server_F')
@@ -21,21 +31,38 @@ export default function NetworkRoutingPage() {
   // Walkthrough State
   const [currentStepIdx, setCurrentStepIdx] = useState<number>(0)
   
-  const nodes = Object.keys(graph)
+  let nodes = Object.keys(graph)
+  if (inputType === 'manual') {
+    try {
+      nodes = Object.keys(JSON.parse(jsonInput))
+    } catch(e) {}
+  }
 
   const handleSolve = async () => {
     setLoading(true)
     setResults(null)
     setCurrentStepIdx(0)
     
+    let currentGraph = graph
+    if (inputType === 'manual') {
+      try {
+        currentGraph = JSON.parse(jsonInput)
+        setGraph(currentGraph)
+      } catch (e: any) {
+        alert('Invalid JSON input: ' + e.message)
+        setLoading(false)
+        return
+      }
+    }
+
     try {
       const payload = {
-        graph,
+        graph: currentGraph,
         start: startNode,
         end: endNode
       }
       
-      const response = await fetch('http://localhost:8000/dijkstra-routing', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/dijkstra-routing`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -115,26 +142,55 @@ export default function NetworkRoutingPage() {
 
               {/* Show Network Edges Configuration */}
               <div className="border-t border-border/30 pt-4 space-y-3">
-                <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Topology Connectivity</h4>
-                <div className="max-h-48 overflow-y-auto pr-2 custom-scrollbar space-y-2 text-xs">
-                  {Object.entries(graph).map(([fromNode, edges]: any) => (
-                    <div key={fromNode} className="p-2 bg-background/50 border border-border/10 rounded">
-                      <div className="font-bold text-primary mb-1">{fromNode.replace('_', ' ')}</div>
-                      {Object.keys(edges).length === 0 ? (
-                        <span className="text-muted-foreground italic">No outgoing nodes</span>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-1.5 font-mono text-[10px]">
-                          {Object.entries(edges).map(([toNode, weight]: any) => (
-                            <div key={toNode} className="flex justify-between border-b border-border/10">
-                              <span>→ {toNode.split('_')[1]}</span>
-                              <span className="text-accent">{weight} ms</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div className="flex bg-background/50 p-1 rounded-lg border border-border/20 mb-2">
+                  <button
+                    onClick={() => setInputType('automatic')}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${inputType === 'automatic' ? 'bg-primary text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    Automatic
+                  </button>
+                  <button
+                    onClick={() => setInputType('manual')}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${inputType === 'manual' ? 'bg-primary text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    Manual JSON
+                  </button>
                 </div>
+
+                {inputType === 'automatic' ? (
+                  <>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Topology Connectivity</h4>
+                    <div className="max-h-48 overflow-y-auto pr-2 custom-scrollbar space-y-2 text-xs">
+                      {Object.entries(graph).map(([fromNode, edges]: any) => (
+                        <div key={fromNode} className="p-2 bg-background/50 border border-border/10 rounded">
+                          <div className="font-bold text-primary mb-1">{fromNode.replace('_', ' ')}</div>
+                          {Object.keys(edges).length === 0 ? (
+                            <span className="text-muted-foreground italic">No outgoing nodes</span>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-1.5 font-mono text-[10px]">
+                              {Object.entries(edges).map(([toNode, weight]: any) => (
+                                <div key={toNode} className="flex justify-between border-b border-border/10">
+                                  <span>→ {toNode.split('_')[1] || toNode}</span>
+                                  <span className="text-accent">{weight} ms</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-muted-foreground uppercase">Adjacency List (JSON)</label>
+                    <textarea
+                      value={jsonInput}
+                      onChange={(e) => setJsonInput(e.target.value)}
+                      className="w-full h-48 bg-background/40 border border-border/30 rounded-lg p-3 font-mono text-xs text-foreground focus:outline-none focus:border-primary/50"
+                      spellCheck={false}
+                    />
+                  </div>
+                )}
               </div>
 
               <button
@@ -162,7 +218,7 @@ export default function NetworkRoutingPage() {
                 <div>
                   <span className="text-muted-foreground block text-xs uppercase font-bold mb-1">Optimal Route</span>
                   <span className="font-bold text-base text-accent flex items-center gap-2">
-                    {results.shortest_path.map(n => n.replace('Server_', '')).join(' ➔ ')}
+                    {results.shortest_path.map((n: string) => n.replace('Server_', '')).join(' ➔ ')}
                   </span>
                 </div>
                 <div className="text-right">
@@ -208,9 +264,9 @@ export default function NetworkRoutingPage() {
                       
                       let borderClass = 'border-border/30 bg-card/40 text-muted-foreground'
                       if (isCurrent) {
-                        borderClass = 'border-accent bg-accent/20 text-accent font-bold scale-105 shadow-lg shadow-accent/15'
+                        borderClass = 'border-[#00d8ff] bg-[#00d8ff]/20 text-[#00d8ff] font-bold scale-105 shadow-[0_0_20px_#00d8ff]'
                       } else if (isVisited) {
-                        borderClass = 'border-primary bg-primary/20 text-primary font-bold shadow-md shadow-primary/10'
+                        borderClass = 'border-[#00FF88] bg-[#00FF88]/20 text-[#00FF88] font-bold shadow-[0_0_15px_rgba(0,255,136,0.3)]'
                       }
                       
                       return (
@@ -283,6 +339,64 @@ export default function NetworkRoutingPage() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Theory & Study Guide */}
+      <div className="mt-12 bg-card/50 backdrop-blur-md border border-border/30 rounded-lg p-8">
+        <h2 className="text-2xl font-bold text-primary mb-6 flex items-center gap-2 border-b border-border/20 pb-4">
+          <Info className="w-6 h-6" /> Theory & Study Guide: Single Source Shortest Path
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Algorithm Overview</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Dijkstra's algorithm finds the shortest paths between nodes in a graph. Given a source node, it calculates the lowest-cost route to all other reachable nodes.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Algorithmic Paradigm</h3>
+              <div className="inline-block px-3 py-1 bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase rounded-md mb-2">Greedy Approach</div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                It uses a Greedy strategy: it maintains a priority queue of unvisited nodes and always selects the one with the smallest tentative distance from the source.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Complexity Envelope</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><strong className="text-foreground">Time Complexity:</strong> <span className="font-mono text-accent">O((V + E) log V)</span> (When using an adjacency list and a Min-Heap / Priority Queue)</li>
+                <li><strong className="text-foreground">Auxiliary Space:</strong> <span className="font-mono text-accent">O(V)</span> (To store the distance array, visited set, and Priority Queue)</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Step-by-Step Mechanisms</h3>
+              
+              <div className="mb-4">
+                <strong className="text-accent text-sm block mb-1">Dijkstra's Logic</strong>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                  <li>Set the distance to the source node to $0$ and to all other nodes to $\infty$.</li>
+                  <li>Insert all nodes into a Min-Priority Queue.</li>
+                  <li>Extract the node $U$ with the minimum distance from the queue.</li>
+                  <li>For each neighbor $V$ of $U$, perform <strong className="text-foreground">Edge Relaxation</strong>: if $dist[U] + weight(U, V) &lt; dist[V]$, update $dist[V]$ to the new smaller distance.</li>
+                  <li>Mark $U$ as visited and repeat until the queue is empty.</li>
+                </ul>
+              </div>
+
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-md">
+                <strong className="text-red-400 text-xs block mb-1">Limitation: Negative Weights</strong>
+                <p className="text-xs text-muted-foreground">
+                  Dijkstra's fails if the graph has negative edge weights. Because it strictly visits each node once and assumes paths only get longer, a negative edge can create a shorter path to a previously "finished" node, breaking the greedy guarantee. (Use Bellman-Ford instead for negative weights).
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -23,6 +23,16 @@ export default function MSTPlannerPage() {
     'Server_F': { 'Server_D': 6, 'Server_E': 3 }
   })
   
+  const [inputType, setInputType] = useState<'automatic' | 'manual'>('automatic')
+  const [jsonInput, setJsonInput] = useState<string>(JSON.stringify({
+    'Server_A': { 'Server_B': 4, 'Server_C': 2 },
+    'Server_B': { 'Server_A': 4, 'Server_C': 1, 'Server_D': 5 },
+    'Server_C': { 'Server_A': 2, 'Server_B': 1, 'Server_D': 8, 'Server_E': 10 },
+    'Server_D': { 'Server_B': 5, 'Server_C': 8, 'Server_E': 2, 'Server_F': 6 },
+    'Server_E': { 'Server_C': 10, 'Server_D': 2, 'Server_F': 3 },
+    'Server_F': { 'Server_D': 6, 'Server_E': 3 }
+  }, null, 2))
+
   const [loading, setLoading] = useState<boolean>(false)
   const [results, setResults] = useState<any>(null)
   
@@ -39,11 +49,23 @@ export default function MSTPlannerPage() {
     setCurrentStepIdx(0)
     stopPlayback()
 
+    let currentGraph = graph
+    if (inputType === 'manual') {
+      try {
+        currentGraph = JSON.parse(jsonInput)
+        setGraph(currentGraph)
+      } catch (e: any) {
+        alert('Invalid JSON input: ' + e.message)
+        setLoading(false)
+        return
+      }
+    }
+
     try {
-      const response = await fetch('http://localhost:8000/mst-trace', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/mst-trace`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ graph })
+        body: JSON.stringify({ graph: currentGraph })
       })
 
       if (!response.ok) {
@@ -195,20 +217,49 @@ export default function MSTPlannerPage() {
               <Network className="w-5 h-5" /> Network Topologies
             </h3>
             
-            <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-              We define a cloud topology with 6 main server nodes and 9 potential high-capacity transmission channels. Click below to load routing matrices.
-            </p>
-
-            <div className="border border-border/20 rounded-lg p-3 bg-background/40 max-h-64 overflow-y-auto pr-2 custom-scrollbar space-y-2 mb-6">
-              {allEdges.map((ed, idx) => (
-                <div key={idx} className="flex justify-between items-center text-xs p-2 border-b border-border/10">
-                  <span className="font-mono text-muted-foreground">
-                    {ed.from.replace('Server_', '')} ── {ed.to.replace('Server_', '')}
-                  </span>
-                  <span className="font-mono font-bold text-accent">{ed.weight} Gbps</span>
-                </div>
-              ))}
+            <div className="flex bg-background/50 p-1 rounded-lg border border-border/20 mb-4">
+              <button
+                onClick={() => setInputType('automatic')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${inputType === 'automatic' ? 'bg-primary text-background' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                Automatic
+              </button>
+              <button
+                onClick={() => setInputType('manual')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${inputType === 'manual' ? 'bg-primary text-background' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                Manual JSON
+              </button>
             </div>
+
+            {inputType === 'automatic' ? (
+              <>
+                <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                  We define a cloud topology with 6 main server nodes and 9 potential high-capacity transmission channels. Click below to load routing matrices.
+                </p>
+
+                <div className="border border-border/20 rounded-lg p-3 bg-background/40 max-h-64 overflow-y-auto pr-2 custom-scrollbar space-y-2 mb-6">
+                  {allEdges.map((ed, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-xs p-2 border-b border-border/10">
+                      <span className="font-mono text-muted-foreground">
+                        {ed.from.replace('Server_', '')} ── {ed.to.replace('Server_', '')}
+                      </span>
+                      <span className="font-mono font-bold text-accent">{ed.weight} Gbps</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="mb-6 space-y-2">
+                <label className="text-xs font-bold text-muted-foreground uppercase">Adjacency List (JSON)</label>
+                <textarea
+                  value={jsonInput}
+                  onChange={(e) => setJsonInput(e.target.value)}
+                  className="w-full h-48 bg-background/40 border border-border/30 rounded-lg p-3 font-mono text-xs text-foreground focus:outline-none focus:border-primary/50"
+                  spellCheck={false}
+                />
+              </div>
+            )}
 
             <button
               onClick={handleSolve}
@@ -321,10 +372,19 @@ export default function MSTPlannerPage() {
                 {/* SVG Graph Container */}
                 <div className="bg-black/60 rounded-lg border border-border/15 p-4 flex justify-center relative overflow-hidden">
                   <svg viewBox="0 0 640 320" className="w-full h-auto max-w-[640px] select-none font-sans">
+                    <defs>
+                      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="4" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                      </filter>
+                    </defs>
+
                     {/* Render regular edges */}
                     {allEdges.map((ed, idx) => {
-                      const fromPos = NODE_POSITIONS[ed.from]
-                      const toPos = NODE_POSITIONS[ed.to]
+                      const getPos = (name: string, i: number, arr: any[]) => NODE_POSITIONS[name] || { x: 320 + 200 * Math.cos(2 * Math.PI * i / arr.length), y: 160 + 100 * Math.sin(2 * Math.PI * i / arr.length) }
+                      const nodesArr = Object.keys(graph)
+                      const fromPos = getPos(ed.from, nodesArr.indexOf(ed.from), nodesArr)
+                      const toPos = getPos(ed.to, nodesArr.indexOf(ed.to), nodesArr)
                       if (!fromPos || !toPos) return null
 
                       const status = getEdgeStatus(ed.from, ed.to)
@@ -355,6 +415,7 @@ export default function MSTPlannerPage() {
                             strokeWidth={strokeWidth}
                             strokeDasharray={strokeDash}
                             className="transition-all duration-300"
+                            filter={(status === 'accepted' || status === 'testing') ? "url(#glow)" : ""}
                           />
                           {/* Weight badge background */}
                           <rect
@@ -368,15 +429,16 @@ export default function MSTPlannerPage() {
                             strokeWidth="1"
                           />
                           {/* Weight label */}
-                          <text
-                            x={(fromPos.x + toPos.x) / 2}
-                            y={(fromPos.y + toPos.y) / 2 + 4}
-                            textAnchor="middle"
-                            fill="#00d8ff"
-                            fontSize="9"
-                            fontFamily="monospace"
-                            fontWeight="bold"
-                          >
+                            <text
+                              x={(fromPos.x + toPos.x) / 2}
+                              y={(fromPos.y + toPos.y) / 2 + 4}
+                              textAnchor="middle"
+                              fill="#00d8ff"
+                              fontSize="9"
+                              fontFamily="monospace"
+                              fontWeight="bold"
+                              filter={(status === 'accepted' || status === 'testing') ? "url(#glow)" : ""}
+                            >
                             {ed.weight}
                           </text>
                         </g>
@@ -384,7 +446,10 @@ export default function MSTPlannerPage() {
                     })}
 
                     {/* Render servers */}
-                    {Object.entries(NODE_POSITIONS).map(([nodeName, pos]) => {
+                    {Object.keys(graph).map((nodeName, nodeIdx, nodesArr) => {
+                      const getPos = (name: string, i: number, arr: any[]) => NODE_POSITIONS[name] || { x: 320 + 200 * Math.cos(2 * Math.PI * i / arr.length), y: 160 + 100 * Math.sin(2 * Math.PI * i / arr.length) }
+                      const pos = getPos(nodeName, nodeIdx, nodesArr)
+
                       let isVisited = false
                       let isCurrent = false
 
@@ -491,6 +556,67 @@ export default function MSTPlannerPage() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Theory & Study Guide */}
+      <div className="mt-12 bg-card/50 backdrop-blur-md border border-border/30 rounded-lg p-8">
+        <h2 className="text-2xl font-bold text-primary mb-6 flex items-center gap-2 border-b border-border/20 pb-4">
+          <Info className="w-6 h-6" /> Theory & Study Guide: Minimum Spanning Trees (MST)
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Algorithm Overview</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                A Minimum Spanning Tree is a subset of the edges of a connected, edge-weighted graph that connects all the vertices together, without any cycles, and with the minimum possible total edge weight.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Algorithmic Paradigm</h3>
+              <div className="inline-block px-3 py-1 bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase rounded-md mb-2">Greedy Approach</div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Both Prim's and Kruskal's algorithms use the Greedy approach. At each step, they make a locally optimal choice (e.g., picking the cheapest available edge) with the hope of finding a global optimum.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Complexity Envelope</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><strong className="text-foreground">Kruskal's Time:</strong> <span className="font-mono text-accent">O(E log E)</span> (Sorting the edges dominates)</li>
+                <li><strong className="text-foreground">Prim's Time:</strong> <span className="font-mono text-accent">O(E log V)</span> (Using a Min-Priority Queue)</li>
+                <li><strong className="text-foreground">Auxiliary Space:</strong> <span className="font-mono text-accent">O(V)</span> (For Disjoint Sets or Priority Queue mappings)</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Step-by-Step Mechanisms</h3>
+              
+              <div className="mb-4">
+                <strong className="text-accent text-sm block mb-1">Kruskal's Algorithm (Edge-based)</strong>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                  <li>Sort all edges in ascending order of their weight.</li>
+                  <li>Pick the smallest edge. Check if it forms a cycle with the spanning tree formed so far using a <strong className="text-foreground">Disjoint Set (Union-Find)</strong> data structure.</li>
+                  <li>If no cycle is formed, include this edge. Else, discard it.</li>
+                  <li>Repeat until there are $V - 1$ edges in the spanning tree.</li>
+                </ul>
+              </div>
+
+              <div>
+                <strong className="text-accent text-sm block mb-1">Prim's Algorithm (Vertex-based)</strong>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                  <li>Initialize a tree with a single, arbitrarily chosen vertex.</li>
+                  <li>Maintain a fringe (priority queue) of all edges connecting the tree to vertices not yet in the tree.</li>
+                  <li>Greedy pick the minimum-weight edge from the fringe and add the corresponding vertex to the tree.</li>
+                  <li>Update the fringe and repeat until all vertices are included.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

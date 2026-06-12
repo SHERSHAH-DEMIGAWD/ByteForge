@@ -22,10 +22,15 @@ from algorithms.lzw import lzw_decompress
 from algorithms.arithmetic import arithmetic_decompress
 from utils.profiler import profile_algorithm
 
-from algorithms.string_matching import naive_search, horspool_search, boyer_moore_search
+from algorithms.string_matching import naive_search, horspool_search, boyer_moore_search, kmp_search
 from algorithms.knapsack import solve_01_knapsack, solve_fractional_knapsack
 from algorithms.dijkstra import solve_dijkstra
 from algorithms.topological import solve_kahns_topological, solve_dfs_topological
+from algorithms.bellman_ford import solve_bellman_ford
+from algorithms.astar import solve_astar
+from algorithms.lcs import solve_lcs
+from algorithms.nqueens import solve_nqueens
+from algorithms.strassen import solve_strassen
 
 from algorithms.sorting import quick_sort_trace, merge_sort_trace, heap_sort_trace, counting_sort_trace, bubble_sort_trace, selection_sort_trace
 from algorithms.mst import solve_kruskals, solve_prims
@@ -195,7 +200,10 @@ async def decompress_endpoint(req: DecompressRequest):
         if algo == "huffman":
             if not req.metadata or "codebook" not in req.metadata:
                 raise ValueError("Huffman requires a 'codebook' in metadata")
-            decompressed = huffman_decompress(compressed_data, req.metadata["codebook"])
+            
+            # JSON serialization converts int keys to strings, need to convert them back
+            codebook = {int(k): v for k, v in req.metadata["codebook"].items()}
+            decompressed = huffman_decompress(compressed_data, codebook)
         elif algo == "rle":
             decompressed = rle_decompress(compressed_data)
         elif algo == "lz77":
@@ -220,7 +228,7 @@ async def decompress_endpoint(req: DecompressRequest):
         elif algo == "arithmetic":
             if not req.metadata or "prob_ranges" not in req.metadata or "total_length" not in req.metadata:
                 raise ValueError("Arithmetic requires 'prob_ranges' and 'total_length' in metadata")
-            prob_ranges = {k.encode('utf-8') if isinstance(k, str) else bytes([int(k)]): tuple(v) for k, v in req.metadata["prob_ranges"].items()}
+            prob_ranges = {int(k): tuple(v) for k, v in req.metadata["prob_ranges"].items()}
             decompressed = arithmetic_decompress(compressed_data, prob_ranges, req.metadata["total_length"])
         else:
             raise HTTPException(status_code=400, detail=f"Unknown algorithm: {algo}")
@@ -245,11 +253,13 @@ async def string_matching_endpoint(req: StringMatchingRequest):
         naive_res = naive_search(req.text, req.pattern)
         horspool_res = horspool_search(req.text, req.pattern)
         bm_res = boyer_moore_search(req.text, req.pattern)
-        
+        kmp_res = kmp_search(req.text, req.pattern)
+
         return {
             "naive": naive_res,
             "horspool": horspool_res,
-            "boyer_moore": bm_res
+            "boyer_moore": bm_res,
+            "kmp": kmp_res
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"String matching error: {str(e)}")
@@ -311,6 +321,84 @@ async def topological_endpoint(req: TopologicalRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Topological sort error: {str(e)}")
+
+class BellmanFordRequest(BaseModel):
+    graph: Dict[str, Dict[str, int]]
+    start: str
+    end: Optional[str] = None
+
+@app.post("/bellman-ford")
+async def bellman_ford_endpoint(req: BellmanFordRequest):
+    if not req.graph or not req.start:
+        raise HTTPException(status_code=400, detail="Missing graph or start node")
+    if len(req.graph) > 26:
+        raise HTTPException(status_code=400, detail="Graph capped at 26 vertices for visualization")
+    try:
+        return solve_bellman_ford(req.graph, req.start, req.end)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Bellman-Ford solver error: {str(e)}")
+
+class AStarRequest(BaseModel):
+    rows: int
+    cols: int
+    walls: List[List[int]] = []
+    start: List[int]
+    goal: List[int]
+
+@app.post("/astar")
+async def astar_endpoint(req: AStarRequest):
+    if req.rows < 2 or req.cols < 2 or req.rows > 30 or req.cols > 40:
+        raise HTTPException(status_code=400, detail="Grid must be between 2x2 and 30x40")
+    if len(req.start) != 2 or len(req.goal) != 2:
+        raise HTTPException(status_code=400, detail="Start and goal must be [row, col] pairs")
+    try:
+        return solve_astar(req.rows, req.cols, req.walls, req.start, req.goal)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"A* solver error: {str(e)}")
+
+class LCSRequest(BaseModel):
+    a: str
+    b: str
+
+@app.post("/lcs")
+async def lcs_endpoint(req: LCSRequest):
+    if not req.a or not req.b:
+        raise HTTPException(status_code=400, detail="Both strings are required")
+    if len(req.a) > 30 or len(req.b) > 30:
+        raise HTTPException(status_code=400, detail="Strings capped at 30 characters so the DP table stays readable")
+    try:
+        return solve_lcs(req.a, req.b)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LCS solver error: {str(e)}")
+
+class NQueensRequest(BaseModel):
+    n: int
+
+@app.post("/nqueens")
+async def nqueens_endpoint(req: NQueensRequest):
+    try:
+        return solve_nqueens(req.n)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"N-Queens solver error: {str(e)}")
+
+class StrassenRequest(BaseModel):
+    a: List[List[int]]
+    b: List[List[int]]
+
+@app.post("/strassen")
+async def strassen_endpoint(req: StrassenRequest):
+    try:
+        return solve_strassen(req.a, req.b)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Strassen solver error: {str(e)}")
 
 class BatchProfileRequest(BaseModel):
     algorithm: str

@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { Plus, Trash, Database, ArrowRight, Table, Info } from 'lucide-react'
+import { ShareButton } from '@/components/share-button'
+import { ExportReportButton } from '@/components/export-report'
+import { useSharedParams } from '@/lib/share'
 
 interface Item {
   name: string
@@ -25,6 +28,23 @@ export default function KnapsackPage() {
   const [loading, setLoading] = useState<boolean>(false)
   const [results, setResults] = useState<any>(null)
   
+  // Restore inputs from a shared link (?cap=15&items=name:4:30,name2:8:80)
+  useSharedParams((params) => {
+    const cap = parseInt(params.get('cap') || '')
+    if (!isNaN(cap) && cap > 0 && cap <= 50) setCapacity(cap)
+    const itemsParam = params.get('items')
+    if (itemsParam) {
+      const parsed = itemsParam
+        .split(',')
+        .map((entry) => {
+          const [name, weight, value] = entry.split(':')
+          return { name: decodeURIComponent(name || ''), weight: parseInt(weight), value: parseInt(value) }
+        })
+        .filter((it) => it.name && !isNaN(it.weight) && !isNaN(it.value))
+      if (parsed.length > 0) setItems(parsed)
+    }
+  })
+
   const addItem = () => {
     if (!newItemName) return
     setItems([...items, { name: newItemName, weight: newItemWeight, value: newItemValue }])
@@ -46,7 +66,7 @@ export default function KnapsackPage() {
         capacity
       }
       
-      const response = await fetch('http://localhost:8000/knapsack', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/knapsack`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -69,13 +89,51 @@ export default function KnapsackPage() {
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent mb-2">
-          Knapsack Bandwidth Allocator
-        </h1>
-        <p className="text-muted-foreground">
-          Study Unit IV Dynamic Programming vs. Greedy choice by optimizing compressed file transmissions under bandwidth limits.
-        </p>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent mb-2">
+            Knapsack Bandwidth Allocator
+          </h1>
+          <p className="text-muted-foreground">
+            Study Unit IV Dynamic Programming vs. Greedy choice by optimizing compressed file transmissions under bandwidth limits.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <ShareButton
+            state={{
+              cap: capacity,
+              items: items.map((it) => `${encodeURIComponent(it.name)}:${it.weight}:${it.value}`).join(','),
+            }}
+          />
+          <ExportReportButton
+            disabled={!results}
+            getReport={() => ({
+              title: 'Knapsack Allocation Report',
+              subtitle: `${items.length} files competing for ${capacity} MB of bandwidth`,
+              metrics: [
+                { label: '0/1 DP Optimal Value', value: results?.dp?.max_value ?? '-' },
+                { label: 'Fractional Greedy Value', value: results?.greedy?.max_value?.toFixed(2) ?? '-' },
+                { label: 'Capacity (MB)', value: capacity },
+              ],
+              tables: [
+                {
+                  title: 'Input Files',
+                  headers: ['File', 'Weight (MB)', 'Utility', 'Selected by 0/1 DP'],
+                  rows: items.map((it, idx) => [
+                    it.name,
+                    it.weight,
+                    it.value,
+                    results?.dp?.selected_indices?.includes(idx) ? 'Yes' : 'No',
+                  ]),
+                },
+              ],
+              notes: [
+                'The 0/1 DP solution never splits a file; the greedy fractional solution may take a fraction of the last file.',
+                'The greedy approach is only optimal when fractions are allowed — for 0/1 constraints it can be arbitrarily bad.',
+              ],
+            })}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

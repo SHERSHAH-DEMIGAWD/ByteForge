@@ -1,79 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import { GraduationCap, Award, HelpCircle, BookOpen, Calculator, Info, Grid, FileText } from 'lucide-react'
+import { GraduationCap, Award, HelpCircle, BookOpen, Calculator, Info, Grid, FileText, Target } from 'lucide-react'
 
-// Mock Viva Questions Database
-const VIVA_QUESTIONS = [
-  {
-    id: 1,
-    question: "Why does Dijkstra's algorithm fail on negative edge weights? What is the alternative?",
-    category: "Greedy Techniques (Unit IV)",
-    answer: [
-      "Greedy Choice Assumption: Dijkstra's assumes that once a vertex is added to the visited set, its shortest path is finalized. Negative weights can violate this by offering a 'backdoor' shorter path later.",
-      "Cut-Crossing: If a negative edge exists, relaxing it might reduce the distance of an already visited node, but Dijkstra's does not re-add visited nodes to the priority queue.",
-      "Alternative: The Bellman-Ford algorithm (Dynamic Programming) handles negative weights and detects negative cycles by relaxing all edges $V-1$ times. Complexity: $O(V \\cdot E)$."
-    ]
-  },
-  {
-    id: 2,
-    question: "What is the key difference between Kruskal's and Prim's MST strategies? When is one preferred?",
-    category: "Greedy Techniques (Unit IV)",
-    answer: [
-      "Selection Strategy: Kruskal's is edge-based (selects the cheapest globally available edge that doesn't form a cycle). Prim's is vertex-based (grows a single tree from a root, selecting the cheapest edge connected to visited nodes).",
-      "Core Data Structures: Kruskal's uses a Disjoint Set (Union-Find) with path compression. Prim's uses a Priority Queue (Min-Heap).",
-      "Preference: Kruskal's is better for sparse graphs (fewer edges, $E \\approx V$). Prim's is better for dense graphs (many edges, $E \\approx V^2$)."
-    ]
-  },
-  {
-    id: 3,
-    question: "What is the Principle of Optimality in Dynamic Programming? Give an example.",
-    category: "Dynamic Programming (Unit IV)",
-    answer: [
-      "Definition: An optimal solution to an instance of a problem contains optimal solutions to its subproblems.",
-      "Example: In the Shortest Path problem, if the shortest path from A to C passes through B, then the segment from A to B must be the shortest path from A to B, and B to C must be the shortest path from B to C.",
-      "Counterexample: Longest simple path does NOT satisfy the principle of optimality because combining two longest simple subpaths can create cycles."
-    ]
-  },
-  {
-    id: 4,
-    question: "What makes Quick Sort run in O(N²) worst-case time? How do we mitigate it?",
-    category: "Divide & Conquer (Unit II)",
-    answer: [
-      "Worst Case Cause: Extremely unbalanced partitioning. This happens when the array is already sorted (or reverse sorted) and we consistently pick the smallest or largest element as the pivot. The tree depth becomes $O(N)$ instead of $O(\\log N)$.",
-      "Mitigation 1: Randomized Quick Sort. Pick a random element as the pivot, ensuring a high probability of balanced splits. Expected time becomes $O(N \\log N)$.",
-      "Mitigation 2: Median-of-Three. Select the median of the first, middle, and last elements as the pivot."
-    ]
-  },
-  {
-    id: 5,
-    question: "How does a Decision Tree prove the lower bound of comparison-based sorting is Ω(N log N)?",
-    category: "Decision Trees (Unit V)",
-    answer: [
-      "Leaf Nodes Representation: Any sorting algorithm must distinguish between all $N!$ permutations of an array. Therefore, the decision tree must have at least $N!$ leaves.",
-      "Height vs Leaves: A binary tree of height $h$ can have at most $2^h$ leaves. Thus: $2^h \\ge N!$.",
-      "Taking Logarithms: Applying logarithms yields $h \\ge \\log_2(N!)$. By Stirling's approximation, $\\log_2(N!) \\approx N \\log_2 N - N \\log_2 e$, proving the height (comparisons) is $\\Omega(N \\log N)$."
-    ]
-  },
-  {
-    id: 6,
-    question: "What is the difference between NP-Complete and NP-Hard classes?",
-    category: "NP & NP-Complete (Unit V)",
-    answer: [
-      "NP (Nondeterministic Polynomial): Problems where a proposed solution can be verified in polynomial time.",
-      "NP-Hard: Problems that are at least as hard as the hardest problems in NP. A problem $X$ is NP-Hard if every problem in NP is polynomial-time reducible to $X$.",
-      "NP-Complete: The intersection of NP and NP-Hard. $Y$ is NP-Complete if: (1) $Y \\in \\text{NP}$ and (2) every problem in NP is reducible to $Y$ in polynomial time."
-    ]
-  }
-]
+import { VIVA_QUESTIONS } from './data'
+import { QuizMode } from '@/components/quiz-mode'
 
 export default function VivaGuidePage() {
-  const [activeTab, setActiveTab] = useState<'viva' | 'solvers'>('viva')
+  const [activeTab, setActiveTab] = useState<'viva' | 'solvers' | 'quiz'>('viva')
   const [activeSolver, setActiveSolver] = useState<'binomial' | 'floyd'>('binomial')
   
   // Viva States
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState<number>(0)
   const [showAnswer, setShowAnswer] = useState<boolean>(false)
+  const [selectedTopic, setSelectedTopic] = useState<string>('All Topics')
 
   // Binomial Coefficient DP States
   const [binomN, setBinomN] = useState<number>(6)
@@ -130,7 +70,12 @@ export default function VivaGuidePage() {
     setFloydK(0)
   }
 
-  const currentQuestion = VIVA_QUESTIONS[currentQuestionIdx]
+  const filteredQuestions = selectedTopic === 'All Topics' 
+    ? VIVA_QUESTIONS 
+    : VIVA_QUESTIONS.filter(q => q.topic === selectedTopic)
+
+  const currentQuestion = filteredQuestions[currentQuestionIdx] || filteredQuestions[0]
+  const topics = ['All Topics', ...Array.from(new Set(VIVA_QUESTIONS.map(q => q.topic)))]
 
   return (
     <div className="p-8">
@@ -170,6 +115,16 @@ export default function VivaGuidePage() {
         >
           <Calculator className="w-4 h-4" /> Dynamic DP Solvers
         </button>
+        <button
+          onClick={() => setActiveTab('quiz')}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-bold uppercase rounded-lg border transition-all ${
+            activeTab === 'quiz'
+              ? 'bg-primary/20 text-primary border-primary/45'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Target className="w-4 h-4" /> Exam Mode
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -177,9 +132,30 @@ export default function VivaGuidePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Question Panel */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Topic Filter */}
+            <div className="flex flex-wrap gap-2">
+              {topics.map(topic => (
+                <button
+                  key={topic}
+                  onClick={() => {
+                    setSelectedTopic(topic)
+                    setCurrentQuestionIdx(0)
+                    setShowAnswer(false)
+                  }}
+                  className={`px-3 py-1.5 text-xs font-bold uppercase rounded-lg border transition-all ${
+                    selectedTopic === topic
+                      ? 'bg-primary/20 text-primary border-primary/40'
+                      : 'bg-card/50 border-border/30 text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {topic}
+                </button>
+              ))}
+            </div>
+
             <div className="bg-card/50 backdrop-blur-md border border-border/30 rounded-lg p-8 relative overflow-hidden">
               <div className="absolute top-4 right-4 text-[10px] uppercase font-bold text-accent bg-accent/10 border border-accent/20 px-2 py-1 rounded">
-                {currentQuestion.category}
+                {currentQuestion.topic}
               </div>
 
               <div className="flex items-start gap-4 mt-4">
@@ -222,7 +198,7 @@ export default function VivaGuidePage() {
             <div className="flex justify-between items-center bg-card/40 p-4 border border-border/20 rounded-lg">
               <button
                 onClick={() => {
-                  setCurrentQuestionIdx(prev => (prev === 0 ? VIVA_QUESTIONS.length - 1 : prev - 1))
+                  setCurrentQuestionIdx(prev => (prev === 0 ? filteredQuestions.length - 1 : prev - 1))
                   setShowAnswer(false)
                 }}
                 className="px-4 py-2 border border-border/30 hover:border-primary/50 text-xs font-bold uppercase rounded-lg transition-all"
@@ -231,12 +207,12 @@ export default function VivaGuidePage() {
               </button>
               
               <span className="font-mono text-xs text-muted-foreground">
-                Question {currentQuestionIdx + 1} / {VIVA_QUESTIONS.length}
+                Question {currentQuestionIdx + 1} / {filteredQuestions.length}
               </span>
 
               <button
                 onClick={() => {
-                  setCurrentQuestionIdx(prev => (prev === VIVA_QUESTIONS.length - 1 ? 0 : prev + 1))
+                  setCurrentQuestionIdx(prev => (prev === filteredQuestions.length - 1 ? 0 : prev + 1))
                   setShowAnswer(false)
                 }}
                 className="px-4 py-2 bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 text-xs font-bold uppercase rounded-lg transition-all"
@@ -302,7 +278,7 @@ export default function VivaGuidePage() {
                   }`}
                 >
                   Floyd-Warshall All-Pairs SP
-                  <span className="block text-[10px] text-muted-foreground font-normal mt-1">Matrix transition states $D^{(k)}$</span>
+                  <span className="block text-[10px] text-muted-foreground font-normal mt-1">{"Matrix transition states $D^{(k)}$"}</span>
                 </button>
               </div>
             </div>
@@ -431,7 +407,7 @@ export default function VivaGuidePage() {
                   <div>
                     <h4 className="text-base font-bold text-primary">Floyd-Warshall Path Transition Matrix</h4>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Displaying intermediate matrix $D^{({floydK})}$ allowing nodes up to {floydK - 1} as paths.
+                      Displaying intermediate matrix {"$D^{(" + floydK + ")}$"} allowing nodes up to {floydK - 1} as paths.
                     </p>
                   </div>
 
@@ -477,12 +453,18 @@ export default function VivaGuidePage() {
                 <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg flex items-start gap-2.5 text-xs text-muted-foreground">
                   <Info className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                   <div>
-                    <span className="font-bold text-foreground">viva Formula:</span> In intermediate matrix $D^{({floydK})}$, each transition relaxes paths by calculating $D^{(k)}[i][j] = \\min(D^{(k-1)}[i][j], D^{(k-1)}[i][k] + D^{(k-1)}[k][j])$. A negative value on the main diagonal indicates a negative cycle!
+                    <span className="font-bold text-foreground">viva Formula:</span> In intermediate matrix {"$D^{(" + floydK + ")}$"}, each transition relaxes paths by calculating {"$D^{(k)}[i][j] = \\min(D^{(k-1)}[i][j], D^{(k-1)}[i][k] + D^{(k-1)}[k][j])$"}. A negative value on the main diagonal indicates a negative cycle!
                   </div>
                 </div>
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {activeTab === 'quiz' && (
+        <div className="animate-in fade-in duration-300">
+          <QuizMode />
         </div>
       )}
     </div>

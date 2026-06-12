@@ -55,7 +55,7 @@ export default function Home() {
         is_base64: false
       }
 
-      const response = await fetch('http://localhost:8000/compress', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/compress`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -295,7 +295,7 @@ export default function Home() {
             )}
 
             {/* AI Predictive Router */}
-            <AIRouter inputData={inputData} onSelectRecommended={handleSelectRecommended} />
+            <AIRouter inputData={inputData || ''} onSelectRecommended={handleSelectRecommended} />
 
             {/* Compress Button */}
             <button
@@ -328,7 +328,7 @@ export default function Home() {
                   />
                   <MetricCard
                     title="File"
-                    value={currentFile}
+                    value={currentFile || 'Manual input'}
                   />
                   {results.shannon_entropy && (
                     <>

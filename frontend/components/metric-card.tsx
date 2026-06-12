@@ -4,9 +4,10 @@ interface MetricCardProps {
   unit?: string
   subtext?: string
   variant?: 'default' | 'success' | 'danger'
+  className?: string
 }
 
-export function MetricCard({ title, value, unit, subtext, variant = 'default' }: MetricCardProps) {
+export function MetricCard({ title, value, unit, subtext, variant = 'default', className = '' }: MetricCardProps) {
   const variantClasses = {
     default: 'text-primary',
     success: 'text-accent',
@@ -14,7 +15,7 @@ export function MetricCard({ title, value, unit, subtext, variant = 'default' }:
   }
 
   return (
-    <div className="bg-card/50 backdrop-blur-md border border-border/30 rounded-lg p-6 hover:border-border/60 transition-all">
+    <div className={`bg-card/50 backdrop-blur-md border border-border/30 rounded-lg p-6 hover:border-border/60 transition-all ${className}`}>
       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
         {title}
       </div>

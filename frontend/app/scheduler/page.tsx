@@ -14,6 +14,18 @@ export default function SchedulerPage() {
     '7_Backtracking': ['8_NP_Completeness'],
     '8_NP_Completeness': []
   })
+
+  const [inputType, setInputType] = useState<'automatic' | 'manual'>('automatic')
+  const [jsonInput, setJsonInput] = useState<string>(JSON.stringify({
+    '1_Fundamentals': ['2_Greedy_Methods', '3_Divide_Conquer', '4_Decrease_Conquer'],
+    '2_Greedy_Methods': ['5_Branch_Bound'],
+    '3_Divide_Conquer': ['6_Dynamic_Prog'],
+    '4_Decrease_Conquer': ['6_Dynamic_Prog', '7_Backtracking'],
+    '5_Branch_Bound': [],
+    '6_Dynamic_Prog': ['5_Branch_Bound', '8_NP_Completeness'],
+    '7_Backtracking': ['8_NP_Completeness'],
+    '8_NP_Completeness': []
+  }, null, 2))
   
   const [loading, setLoading] = useState<boolean>(false)
   const [results, setResults] = useState<any>(null)
@@ -27,11 +39,23 @@ export default function SchedulerPage() {
     setResults(null)
     setCurrentStepIdx(0)
     
+    let currentGraph = graph
+    if (inputType === 'manual') {
+      try {
+        currentGraph = JSON.parse(jsonInput)
+        setGraph(currentGraph)
+      } catch (e: any) {
+        alert('Invalid JSON input: ' + e.message)
+        setLoading(false)
+        return
+      }
+    }
+
     try {
-      const response = await fetch('http://localhost:8000/topological-scheduler', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/topological-scheduler`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ graph })
+        body: JSON.stringify({ graph: currentGraph })
       })
       
       if (!response.ok) {
@@ -89,29 +113,58 @@ export default function SchedulerPage() {
             </h3>
 
             <div className="space-y-4">
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                The nodes represent DAA Syllabus Modules. Directed edges show pre-requisite relationships (e.g. Fundamentals must be studied before Greedy Methods).
-              </p>
-
-              <div className="max-h-80 overflow-y-auto pr-2 custom-scrollbar space-y-2 text-xs">
-                {Object.entries(graph).map(([fromNode, neighbors]: any) => (
-                  <div key={fromNode} className="p-2.5 bg-background/50 border border-border/10 rounded">
-                    <div className="font-bold text-primary mb-1">{formatNodeName(fromNode)}</div>
-                    {neighbors.length === 0 ? (
-                      <span className="text-muted-foreground italic text-[10px]">No prerequisites unlocked by this</span>
-                    ) : (
-                      <div className="space-y-0.5 text-[10px] text-muted-foreground">
-                        {neighbors.map((n: string) => (
-                          <div key={n} className="flex items-center gap-1.5">
-                            <span className="text-accent font-bold">➔</span>
-                            <span>Unlocks {formatNodeName(n)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+              <div className="flex bg-background/50 p-1 rounded-lg border border-border/20 mb-4">
+                <button
+                  onClick={() => setInputType('automatic')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${inputType === 'automatic' ? 'bg-primary text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Automatic
+                </button>
+                <button
+                  onClick={() => setInputType('manual')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${inputType === 'manual' ? 'bg-primary text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Manual JSON
+                </button>
               </div>
+
+              {inputType === 'automatic' ? (
+                <>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    The nodes represent DAA Syllabus Modules. Directed edges show pre-requisite relationships (e.g. Fundamentals must be studied before Greedy Methods).
+                  </p>
+
+                  <div className="max-h-80 overflow-y-auto pr-2 custom-scrollbar space-y-2 text-xs">
+                    {Object.entries(graph).map(([fromNode, neighbors]: any) => (
+                      <div key={fromNode} className="p-2.5 bg-background/50 border border-border/10 rounded">
+                        <div className="font-bold text-primary mb-1">{formatNodeName(fromNode)}</div>
+                        {neighbors.length === 0 ? (
+                          <span className="text-muted-foreground italic text-[10px]">No prerequisites unlocked by this</span>
+                        ) : (
+                          <div className="space-y-0.5 text-[10px] text-muted-foreground">
+                            {neighbors.map((n: string) => (
+                              <div key={n} className="flex items-center gap-1.5">
+                                <span className="text-accent font-bold">➔</span>
+                                <span>Unlocks {formatNodeName(n)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-muted-foreground uppercase">DAG Adjacency List (JSON)</label>
+                  <textarea
+                    value={jsonInput}
+                    onChange={(e) => setJsonInput(e.target.value)}
+                    className="w-full h-48 bg-background/40 border border-border/30 rounded-lg p-3 font-mono text-xs text-foreground focus:outline-none focus:border-primary/50"
+                    spellCheck={false}
+                  />
+                </div>
+              )}
 
               <button
                 onClick={handleSolve}
@@ -229,7 +282,7 @@ export default function SchedulerPage() {
                         
                         let cardBg = 'bg-card/40 border border-border/10 text-muted-foreground'
                         if (isOrdered) cardBg = 'bg-primary/10 border-primary/20 text-primary line-through opacity-50'
-                        else if (isInQueue) cardBg = 'bg-accent/10 border-accent/20 text-accent font-bold'
+                        else if (isInQueue) cardBg = 'bg-[#00d8ff]/10 border-[#00d8ff]/50 text-[#00d8ff] font-bold shadow-[0_0_15px_rgba(0,216,255,0.4)] scale-105 relative z-10'
                         
                         return (
                           <div key={node} className={`p-3 border rounded-lg text-center transition-all ${cardBg}`}>
@@ -289,6 +342,68 @@ export default function SchedulerPage() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Theory & Study Guide */}
+      <div className="mt-12 bg-card/50 backdrop-blur-md border border-border/30 rounded-lg p-8">
+        <h2 className="text-2xl font-bold text-primary mb-6 flex items-center gap-2 border-b border-border/20 pb-4">
+          <Info className="w-6 h-6" /> Theory & Study Guide: Topological Sorting
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Algorithm Overview</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Topological Sorting provides a linear ordering of vertices in a Directed Acyclic Graph (DAG) such that for every directed edge $U \to V$, vertex $U$ comes before $V$. It is commonly used for scheduling tasks with dependencies.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Algorithmic Paradigm</h3>
+              <div className="inline-block px-3 py-1 bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase rounded-md mb-2">Graph Traversal</div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                This algorithm leverages standard graph traversals. Kahn's uses a BFS-like iterative approach tracking incoming edges (in-degrees), whereas the DFS approach goes deep and appends finished nodes to the front of the sorted list.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Complexity Envelope</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><strong className="text-foreground">Time Complexity:</strong> <span className="font-mono text-accent">O(V + E)</span> (Every vertex and edge is processed exactly once)</li>
+                <li><strong className="text-foreground">Auxiliary Space:</strong> <span className="font-mono text-accent">O(V)</span> (For the queue/stack and in-degree/visited arrays)</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Step-by-Step Mechanisms</h3>
+              
+              <div className="mb-4">
+                <strong className="text-accent text-sm block mb-1">Kahn's Algorithm (In-degree)</strong>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                  <li>Compute the in-degree (number of incoming edges) for all vertices.</li>
+                  <li>Push all vertices with an in-degree of $0$ into a queue.</li>
+                  <li>While the queue is not empty, dequeue vertex $U$ and append it to the sorted order.</li>
+                  <li>For each neighbor $V$ of $U$, decrement its in-degree by 1. If it becomes $0$, push $V$ to the queue.</li>
+                  <li>If the final sorted list has fewer than $V$ elements, the graph has a cycle!</li>
+                </ul>
+              </div>
+
+              <div>
+                <strong className="text-accent text-sm block mb-1">DFS-based Topological Sort</strong>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                  <li>Initialize all vertices as unvisited.</li>
+                  <li>For each unvisited vertex, launch a recursive Depth First Search (DFS).</li>
+                  <li>In DFS, mark the current vertex as visiting. Recurse into all its unvisited neighbors.</li>
+                  <li>Once all neighbors are fully explored, mark the vertex as finished and push it onto a stack.</li>
+                  <li>Popping all elements from the stack gives the topological order.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

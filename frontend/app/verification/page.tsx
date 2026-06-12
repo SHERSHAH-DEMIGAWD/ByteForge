@@ -34,17 +34,17 @@ export default function VerificationPage() {
     try {
       if (selectedAlgo === 'all') {
         const [huffRes, lzRes, rleRes] = await Promise.all([
-          fetch('http://localhost:8000/batch-profile', {
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/batch-profile`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ algorithm: 'huffman', data: textData, sizes })
           }).then(r => r.json()),
-          fetch('http://localhost:8000/batch-profile', {
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/batch-profile`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ algorithm: 'lz77', data: textData, sizes, mode: 'naive' }) // naive to show O(n^2) scaling!
           }).then(r => r.json()),
-          fetch('http://localhost:8000/batch-profile', {
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/batch-profile`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ algorithm: 'rle', data: textData, sizes })
@@ -59,7 +59,7 @@ export default function VerificationPage() {
         }))
         setProfileData(combined)
       } else {
-        const response = await fetch('http://localhost:8000/batch-profile', {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/batch-profile`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

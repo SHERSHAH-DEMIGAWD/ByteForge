@@ -39,8 +39,16 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="font-sans antialiased dark">
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark`} suppressHydrationWarning>
+      <head>
+        {/* Apply stored theme before first paint to avoid a flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem('byteforge-theme')==='light')document.documentElement.classList.remove('dark')}catch(e){}`,
+          }}
+        />
+      </head>
+      <body className="font-sans antialiased">
         <div className="math-watermark math-wm-1">O(N log N)</div>
         <div className="math-watermark math-wm-2">Ω(V + E)</div>
         <div className="flex">

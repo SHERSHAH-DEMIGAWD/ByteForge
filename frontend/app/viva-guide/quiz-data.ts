@@ -1,0 +1,303 @@
+export interface QuizQuestion {
+  id: number
+  topic: string
+  question: string
+  options: string[]
+  correctIdx: number
+  explanation: string
+}
+
+export const QUIZ_QUESTIONS: QuizQuestion[] = [
+  // Sorting & Complexity
+  {
+    id: 1,
+    topic: 'Sorting & Complexity',
+    question: 'Which sorting algorithm guarantees O(N log N) in the worst case AND sorts in-place with O(1) auxiliary space?',
+    options: ['Quick Sort', 'Merge Sort', 'Heap Sort', 'Counting Sort'],
+    correctIdx: 2,
+    explanation: 'Heap Sort is worst-case O(N log N) and in-place. Quick Sort degrades to O(N²); Merge Sort needs O(N) auxiliary space; Counting Sort needs O(N+K) space.',
+  },
+  {
+    id: 2,
+    topic: 'Sorting & Complexity',
+    question: 'Quick Sort hits its O(N²) worst case when...',
+    options: [
+      'the array contains duplicates',
+      'the pivot is always the smallest or largest remaining element',
+      'the array length is a power of 2',
+      'recursion depth exceeds log N',
+    ],
+    correctIdx: 1,
+    explanation: 'An extreme pivot splits the array into sizes 0 and N−1, producing N levels of partitioning instead of log N — e.g. picking the last element on an already-sorted array.',
+  },
+  {
+    id: 3,
+    topic: 'Sorting & Complexity',
+    question: 'How does Counting Sort beat the Ω(N log N) lower bound for sorting?',
+    options: [
+      'It uses parallel comparisons',
+      'It is not comparison-based — it indexes by key value',
+      'It only works on nearly-sorted data',
+      'It does not actually beat the bound',
+    ],
+    correctIdx: 1,
+    explanation: 'The Ω(N log N) bound applies only to comparison sorts. Counting Sort tallies occurrences by integer key (space-time tradeoff), running in O(N + K).',
+  },
+  {
+    id: 4,
+    topic: 'Sorting & Complexity',
+    question: 'Which of these is a STABLE sorting algorithm?',
+    options: ['Heap Sort', 'Quick Sort', 'Selection Sort', 'Merge Sort'],
+    correctIdx: 3,
+    explanation: 'Merge Sort preserves the relative order of equal elements when merging (taking from the left half on ties). Heap, Quick and Selection sort all reorder equal keys.',
+  },
+  // Greedy & Graphs
+  {
+    id: 5,
+    topic: 'Greedy & Graphs',
+    question: 'Why does Dijkstra fail with negative edge weights?',
+    options: [
+      'The priority queue overflows',
+      'It finalizes a vertex greedily and never revisits it',
+      'Negative weights cause integer underflow',
+      'It cannot detect disconnected components',
+    ],
+    correctIdx: 1,
+    explanation: 'Once a vertex is popped from the min-heap its distance is considered final. A negative edge found later could give a shorter route into that vertex, but Dijkstra never re-examines it.',
+  },
+  {
+    id: 6,
+    topic: 'Greedy & Graphs',
+    question: 'Bellman-Ford relaxes all edges exactly V−1 times because...',
+    options: [
+      'V−1 passes are needed to detect negative cycles',
+      'any shortest path contains at most V−1 edges',
+      'the graph has at most V−1 edges',
+      'each pass removes one vertex from the queue',
+    ],
+    correctIdx: 1,
+    explanation: 'A simple path visits each vertex at most once, so it has at most V−1 edges. After pass k all shortest paths of ≤ k edges are correct. (The V-th pass is the negative-cycle CHECK.)',
+  },
+  {
+    id: 7,
+    topic: 'Greedy & Graphs',
+    question: "Kruskal's algorithm uses Union-Find primarily to...",
+    options: [
+      'sort the edges in O(E log E)',
+      'find the minimum weight edge quickly',
+      'detect whether adding an edge would create a cycle',
+      'store the adjacency matrix compactly',
+    ],
+    correctIdx: 2,
+    explanation: 'If both endpoints of an edge are already in the same disjoint set, adding the edge would close a cycle, so it is skipped. Path compression makes each check nearly O(1).',
+  },
+  {
+    id: 8,
+    topic: 'Greedy & Graphs',
+    question: 'When is Prim\'s algorithm preferred over Kruskal\'s?',
+    options: [
+      'On dense graphs where E ≈ V²',
+      'On sparse graphs',
+      'When edges are pre-sorted',
+      'When the graph is disconnected',
+    ],
+    correctIdx: 0,
+    explanation: 'Prim grows one tree using a priority queue — O(E log V) — and avoids globally sorting a massive edge list. Kruskal\'s O(E log E) sort dominates on dense graphs.',
+  },
+  {
+    id: 9,
+    topic: 'Greedy & Graphs',
+    question: 'A* returns an optimal path when its heuristic h(n) is...',
+    options: [
+      'consistent with the edge ordering',
+      'admissible — it never over-estimates the remaining cost',
+      'always exactly equal to the true remaining cost',
+      'monotonically increasing along any path',
+    ],
+    correctIdx: 1,
+    explanation: 'Admissibility (h(n) ≤ true cost) guarantees the goal is never closed prematurely. Manhattan distance on a 4-connected grid is admissible, hence optimal paths.',
+  },
+  // Dynamic Programming
+  {
+    id: 10,
+    topic: 'Dynamic Programming',
+    question: 'The two properties a problem must have for Dynamic Programming to apply are...',
+    options: [
+      'greedy choice + feasibility',
+      'optimal substructure + overlapping subproblems',
+      'divide & conquer + memoization',
+      'recursion + iteration',
+    ],
+    correctIdx: 1,
+    explanation: 'Optimal substructure: the optimum builds from optima of subproblems. Overlapping subproblems: the same subproblems recur, so caching pays off (unlike plain divide & conquer).',
+  },
+  {
+    id: 11,
+    topic: 'Dynamic Programming',
+    question: 'In the 0/1 Knapsack DP table, DP[i][w] = DP[i−1][w] means...',
+    options: [
+      'item i was included',
+      'item i was excluded',
+      'the knapsack is full',
+      'item i has zero value',
+    ],
+    correctIdx: 1,
+    explanation: 'If the value is unchanged from the row above, the optimum for capacity w does not use item i. This is exactly how the selected-items traceback works.',
+  },
+  {
+    id: 12,
+    topic: 'Dynamic Programming',
+    question: 'Why does the greedy ratio approach fail for 0/1 Knapsack but work for Fractional Knapsack?',
+    options: [
+      'Ratios cannot be compared across items',
+      'Greedy needs sorted weights, not ratios',
+      'Without splitting, a high-ratio item can block better combinations',
+      'It does not fail — both are optimal',
+    ],
+    correctIdx: 2,
+    explanation: 'In 0/1, taking the best-ratio item can waste capacity that two lesser items would have filled more valuably. With fractions allowed, you can always top up exactly — greedy becomes optimal.',
+  },
+  {
+    id: 13,
+    topic: 'Dynamic Programming',
+    question: 'The LCS recurrence when characters a[i−1] and b[j−1] MATCH is...',
+    options: [
+      'L[i][j] = max(L[i−1][j], L[i][j−1])',
+      'L[i][j] = L[i−1][j−1] + 1',
+      'L[i][j] = L[i−1][j−1]',
+      'L[i][j] = L[i][j−1] + 1',
+    ],
+    correctIdx: 1,
+    explanation: 'A match extends the best subsequence of both prefixes by one: diagonal + 1. On mismatch you take the max of dropping a character from either string.',
+  },
+  {
+    id: 14,
+    topic: 'Dynamic Programming',
+    question: 'Floyd-Warshall computes all-pairs shortest paths in...',
+    options: ['O(V²)', 'O(V·E)', 'O(V³)', 'O(E log V)'],
+    correctIdx: 2,
+    explanation: 'Three nested loops over k (intermediate vertex), i, j. It handles negative edges, and a negative value appearing on the diagonal reveals a negative cycle.',
+  },
+  // Backtracking & D&C
+  {
+    id: 15,
+    topic: 'Backtracking & Divide-and-Conquer',
+    question: 'In N-Queens, two queens at (r1,c1) and (r2,c2) attack diagonally exactly when...',
+    options: [
+      'r1 + c1 = r2 + c2 or r1 − c1 = r2 − c2',
+      'r1 = r2 or c1 = c2',
+      '|r1 − r2| = 1',
+      'r1·c1 = r2·c2',
+    ],
+    correctIdx: 0,
+    explanation: 'Cells on a ↙ diagonal share row+col; cells on a ↘ diagonal share row−col. Storing these two values in hash sets gives O(1) conflict checks.',
+  },
+  {
+    id: 16,
+    topic: 'Backtracking & Divide-and-Conquer',
+    question: 'Backtracking improves on brute force because it...',
+    options: [
+      'uses randomization to skip states',
+      'prunes entire subtrees as soon as a partial solution is infeasible',
+      'caches previously seen states',
+      'always runs in polynomial time',
+    ],
+    correctIdx: 1,
+    explanation: 'One constraint violation at depth k eliminates all completions below it without enumerating them. Worst case is still exponential, but typical cases collapse dramatically.',
+  },
+  {
+    id: 17,
+    topic: 'Backtracking & Divide-and-Conquer',
+    question: "Strassen's algorithm multiplies two N×N matrices with asymptotic complexity...",
+    options: ['O(N³)', 'O(N^2.807)', 'O(N² log N)', 'O(N²)'],
+    correctIdx: 1,
+    explanation: 'T(N) = 7T(N/2) + O(N²) solves to O(N^log₂7) ≈ O(N^2.807) by the Master Theorem — 7 block products instead of 8 changes the exponent itself.',
+  },
+  {
+    id: 18,
+    topic: 'Backtracking & Divide-and-Conquer',
+    question: 'By the Master Theorem, T(N) = 2T(N/2) + O(N) (Merge Sort) solves to...',
+    options: ['O(N)', 'O(N log N)', 'O(N²)', 'O(log N)'],
+    correctIdx: 1,
+    explanation: 'a=2, b=2, f(N)=N. N^(log₂2) = N matches f(N), the balanced case: T(N) = O(N log N).',
+  },
+  // String Matching & Compression
+  {
+    id: 19,
+    topic: 'Strings & Compression',
+    question: "Horspool's algorithm achieves its speedup by...",
+    options: [
+      'comparing characters left to right',
+      'hashing the pattern',
+      'pre-computing a shift table and skipping ahead on mismatches',
+      'building a suffix tree of the text',
+    ],
+    correctIdx: 2,
+    explanation: 'Input enhancement: the pattern is pre-processed into a shift table. On mismatch, the last character of the text window determines how far the pattern slides — often the full pattern length.',
+  },
+  {
+    id: 20,
+    topic: 'Strings & Compression',
+    question: 'KMP guarantees O(N + M) because...',
+    options: [
+      'it skips every other character',
+      'the failure table ensures the text pointer never moves backwards',
+      'it compares from right to left',
+      'it only works on binary alphabets',
+    ],
+    correctIdx: 1,
+    explanation: 'On mismatch, KMP falls back within the PATTERN (via the LPS table) while keeping its place in the text — no text character is ever re-read.',
+  },
+  {
+    id: 21,
+    topic: 'Strings & Compression',
+    question: 'Huffman coding produces an optimal prefix code by...',
+    options: [
+      'assigning fixed 8-bit codes by frequency rank',
+      'repeatedly merging the two lowest-frequency nodes (greedy)',
+      'dynamic programming over all code lengths',
+      'sorting characters alphabetically',
+    ],
+    correctIdx: 1,
+    explanation: 'The greedy merge of the two rarest symbols is provably optimal (exchange argument). Rare symbols end deep in the tree with long codes; common symbols stay near the root.',
+  },
+  {
+    id: 22,
+    topic: 'Strings & Compression',
+    question: 'Shannon entropy of a data stream tells you...',
+    options: [
+      'the exact compressed size any algorithm achieves',
+      'the theoretical minimum average bits per symbol for lossless coding',
+      'the number of unique characters',
+      'the compression ratio of DEFLATE',
+    ],
+    correctIdx: 1,
+    explanation: 'Entropy H = −Σ p·log₂p is the lower bound on average code length for any lossless scheme. Real algorithms approach it but cannot beat it.',
+  },
+  {
+    id: 23,
+    topic: 'Strings & Compression',
+    question: 'LZ77 differs from Huffman in that it exploits...',
+    options: [
+      'symbol frequency imbalance',
+      'repeated substrings via a sliding-window dictionary',
+      'fixed-length block patterns',
+      'arithmetic probability ranges',
+    ],
+    correctIdx: 1,
+    explanation: 'LZ77 replaces repeats with (offset, length) back-references into a sliding window — no codebook needed. DEFLATE combines both: LZ77 first, then Huffman on the tokens.',
+  },
+  {
+    id: 24,
+    topic: 'Greedy & Graphs',
+    question: "Kahn's topological sort detects a cycle when...",
+    options: [
+      'the queue ever contains two vertices',
+      'fewer than V vertices are output before the queue empties',
+      'any vertex has in-degree greater than 1',
+      'the DFS stack overflows',
+    ],
+    correctIdx: 1,
+    explanation: 'Vertices in a cycle never reach in-degree 0, so they are never enqueued. If the output ordering is shorter than V, a cycle must exist.',
+  },
+]

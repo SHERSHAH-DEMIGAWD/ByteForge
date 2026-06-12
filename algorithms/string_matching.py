@@ -113,6 +113,87 @@ def horspool_search(text: str, pattern: str) -> dict:
         "total_comparisons": comparisons
     }
 
+def kmp_search(text: str, pattern: str) -> dict:
+    """
+    Knuth-Morris-Pratt string matching algorithm.
+    Time Complexity: O(N + M) guaranteed (no re-comparison of matched text).
+    Space Complexity: O(M) for the failure (LPS) table.
+    """
+    n, m = len(text), len(pattern)
+    comparisons = 0
+    alignments = []
+    steps = []
+
+    # 1. Build failure table: lps[j] = length of the longest proper prefix of
+    # pattern[:j+1] that is also a suffix of it.
+    lps = [0] * m
+    length = 0
+    i = 1
+    while i < m:
+        if pattern[i] == pattern[length]:
+            length += 1
+            lps[i] = length
+            i += 1
+        elif length:
+            length = lps[length - 1]
+        else:
+            lps[i] = 0
+            i += 1
+
+    # 2. Search phase — the text pointer never moves backwards.
+    i = j = 0
+    step = None
+    while i < n:
+        if step is None:
+            step = {"alignment_index": i - j, "comparisons": [], "status": "mismatch"}
+        comparisons += 1
+        match = text[i] == pattern[j]
+        step["comparisons"].append({
+            "text_idx": i,
+            "pattern_idx": j,
+            "text_char": text[i],
+            "pattern_char": pattern[j],
+            "match": match,
+        })
+        if match:
+            i += 1
+            j += 1
+            if j == m:
+                step["status"] = "match"
+                step["shift"] = j - lps[j - 1]
+                step["explain"] = (f"Full match at index {i - j}. Failure table lets us keep "
+                                   f"{lps[j - 1]} matched prefix characters and continue scanning.")
+                alignments.append(i - j)
+                if len(steps) < 100:
+                    steps.append(step)
+                step = None
+                j = lps[j - 1]
+        else:
+            if j:
+                step["shift"] = j - lps[j - 1]
+                step["explain"] = (f"Mismatch at pattern index {j}: fall back to lps[{j - 1}] = "
+                                   f"{lps[j - 1]} — the text pointer stays at {i}, no re-comparisons.")
+                j = lps[j - 1]
+            else:
+                step["shift"] = 1
+                step["explain"] = f"Mismatch at pattern index 0: advance the text pointer to {i + 1}."
+                i += 1
+            if len(steps) < 100:
+                steps.append(step)
+            step = None
+
+    if step is not None and step["comparisons"] and len(steps) < 100:
+        step["shift"] = 0
+        step["explain"] = "Reached end of text with a partial match in progress."
+        steps.append(step)
+
+    return {
+        "alignments": alignments,
+        "steps": steps,
+        "lps": lps,
+        "total_comparisons": comparisons,
+    }
+
 def boyer_moore_search(text: str, pattern: str) -> dict:
     """
     Boyer-Moore string matching algorithm (Bad Character heuristic).

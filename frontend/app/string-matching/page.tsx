@@ -1,17 +1,35 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, ChevronLeft, ChevronRight, Play, Square, RefreshCw, BarChart2 } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Play, Square, RefreshCw, BarChart2, Info } from 'lucide-react'
+import { ShareButton } from '@/components/share-button'
+import { ExportReportButton } from '@/components/export-report'
+import { useSharedParams } from '@/lib/share'
 
 export default function StringMatchingPage() {
   const [text, setText] = useState<string>('ABABDABACDABABCABAB')
   const [pattern, setPattern] = useState<string>('ABABCABAB')
+  const [inputType, setInputType] = useState<'automatic' | 'manual'>('automatic')
   const [loading, setLoading] = useState<boolean>(false)
   const [results, setResults] = useState<any>(null)
+
+  const PRESETS = [
+    { label: 'DNA Sequence (Biology)', text: 'GCTAGTCAGCTAGCTACGATCGTAGCTAGCTAGCTGATC', pattern: 'GCTAGC' },
+    { label: 'Binary Stream (CS)', text: '1010110010101010010101110101', pattern: '10101' },
+    { label: 'Repeating English', text: 'ABAB DABA CDAB ABC ABAB', pattern: 'AB ABC' }
+  ]
   
   // Interactive Walkthrough State
-  const [selectedAlgo, setSelectedAlgo] = useState<'naive' | 'horspool' | 'boyer_moore'>('boyer_moore')
+  const [selectedAlgo, setSelectedAlgo] = useState<'naive' | 'horspool' | 'boyer_moore' | 'kmp'>('boyer_moore')
   const [currentStepIdx, setCurrentStepIdx] = useState<number>(0)
+
+  // Restore inputs from a shared link (?text=...&pattern=...)
+  useSharedParams((params) => {
+    const t = params.get('text')
+    const p = params.get('pattern')
+    if (t) { setText(t); setInputType('manual') }
+    if (p) setPattern(p)
+  })
   
   const handleSearch = async () => {
     if (!text || !pattern) return
@@ -20,7 +38,7 @@ export default function StringMatchingPage() {
     setCurrentStepIdx(0)
     
     try {
-      const response = await fetch('http://localhost:8000/string-matching', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/string-matching`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, pattern })
@@ -57,13 +75,48 @@ export default function StringMatchingPage() {
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent mb-2">
-          String Matching Laboratory
-        </h1>
-        <p className="text-muted-foreground">
-          Study Unit III Space-Time Tradeoffs by analyzing Naive matching against Input Enhancement algorithms.
-        </p>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent mb-2">
+            String Matching Laboratory
+          </h1>
+          <p className="text-muted-foreground">
+            Study Unit III Space-Time Tradeoffs by analyzing Naive matching against Input Enhancement algorithms — now with KMP.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <ShareButton state={{ text, pattern }} />
+          <ExportReportButton
+            disabled={!results}
+            getReport={() => ({
+              title: 'String Matching Comparison Report',
+              subtitle: `Pattern "${pattern}" searched in a ${text.length}-character text`,
+              metrics: [
+                { label: 'Text Length', value: text.length },
+                { label: 'Pattern Length', value: pattern.length },
+                { label: 'Matches Found', value: results?.naive?.alignments?.length ?? 0 },
+              ],
+              tables: [
+                {
+                  title: 'Comparison Counts by Algorithm',
+                  headers: ['Algorithm', 'Total Comparisons', 'Matches', 'Comparisons / Character'],
+                  rows: (['naive', 'horspool', 'boyer_moore', 'kmp'] as const)
+                    .filter((a) => results?.[a])
+                    .map((a) => [
+                      a === 'boyer_moore' ? 'Boyer-Moore' : a === 'horspool' ? "Horspool's" : a === 'kmp' ? 'KMP' : 'Naive',
+                      results[a].total_comparisons,
+                      results[a].alignments.length,
+                      (results[a].total_comparisons / Math.max(1, text.length)).toFixed(2),
+                    ]),
+                },
+              ],
+              notes: [
+                'Horspool and Boyer-Moore pre-process the pattern into shift tables (input enhancement) to skip text characters.',
+                'KMP guarantees O(N + M) — its failure table ensures the text pointer never moves backwards.',
+              ],
+            })}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -75,26 +128,60 @@ export default function StringMatchingPage() {
             </h3>
 
             <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1.5">Text Stream</label>
-                <textarea
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  className="w-full h-32 bg-background border border-border/30 rounded-lg p-3 font-mono text-sm focus:outline-none focus:border-primary/50 text-foreground"
-                  placeholder="Enter main text here..."
-                />
+              <div className="flex bg-background/50 p-1 rounded-lg border border-border/20 mb-4">
+                <button
+                  onClick={() => setInputType('automatic')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${inputType === 'automatic' ? 'bg-primary text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Templates
+                </button>
+                <button
+                  onClick={() => setInputType('manual')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${inputType === 'manual' ? 'bg-primary text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Custom Manual
+                </button>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1.5">Search Pattern</label>
-                <input
-                  type="text"
-                  value={pattern}
-                  onChange={(e) => setPattern(e.target.value)}
-                  className="w-full bg-background border border-border/30 rounded-lg p-3 font-mono text-sm focus:outline-none focus:border-primary/50 text-foreground"
-                  placeholder="Enter pattern..."
-                />
-              </div>
+              {inputType === 'automatic' ? (
+                <div className="space-y-3">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1.5">Preset Scenarios</label>
+                  {PRESETS.map((preset, i) => (
+                    <div 
+                      key={i} 
+                      onClick={() => { setText(preset.text); setPattern(preset.pattern) }}
+                      className={`p-3 border rounded-lg cursor-pointer transition-all ${text === preset.text ? 'border-primary bg-primary/10' : 'border-border/30 bg-background/40 hover:bg-background/80'}`}
+                    >
+                      <div className="font-bold text-xs text-primary mb-1">{preset.label}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono truncate">Text: {preset.text}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono">Pattern: {preset.pattern}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1.5">Text Stream</label>
+                    <textarea
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      className="w-full h-32 bg-background border border-border/30 rounded-lg p-3 font-mono text-sm focus:outline-none focus:border-primary/50 text-foreground"
+                      placeholder="Enter main text here..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1.5">Search Pattern</label>
+                    <input
+                      type="text"
+                      value={pattern}
+                      onChange={(e) => setPattern(e.target.value)}
+                      className="w-full bg-background border border-border/30 rounded-lg p-3 font-mono text-sm focus:outline-none focus:border-primary/50 text-foreground"
+                      placeholder="Enter pattern..."
+                    />
+                  </div>
+                </>
+              )}
 
               <button
                 onClick={handleSearch}
@@ -117,7 +204,8 @@ export default function StringMatchingPage() {
                 {[
                   { id: 'naive', name: 'Naive Search', comps: results.naive.total_comparisons, matches: results.naive.alignments.length, color: 'text-red-400' },
                   { id: 'horspool', name: "Horspool's", comps: results.horspool.total_comparisons, matches: results.horspool.alignments.length, color: 'text-blue-400' },
-                  { id: 'boyer_moore', name: 'Boyer-Moore', comps: results.boyer_moore.total_comparisons, matches: results.boyer_moore.alignments.length, color: 'text-green-400' }
+                  { id: 'boyer_moore', name: 'Boyer-Moore', comps: results.boyer_moore.total_comparisons, matches: results.boyer_moore.alignments.length, color: 'text-green-400' },
+                  ...(results.kmp ? [{ id: 'kmp', name: 'KMP', comps: results.kmp.total_comparisons, matches: results.kmp.alignments.length, color: 'text-purple-400' }] : [])
                 ].map((item) => (
                   <div key={item.id} className="p-3 bg-background/50 border border-border/20 rounded-lg">
                     <div className="flex justify-between items-center mb-1">
@@ -149,7 +237,7 @@ export default function StringMatchingPage() {
               {/* Selector */}
               <div className="flex border-b border-border/30 pb-4 justify-between items-center">
                 <div className="flex gap-2">
-                  {(['naive', 'horspool', 'boyer_moore'] as const).map((algo) => (
+                  {(['naive', 'horspool', 'boyer_moore', 'kmp'] as const).map((algo) => (
                     <button
                       key={algo}
                       onClick={() => {
@@ -162,7 +250,7 @@ export default function StringMatchingPage() {
                           : 'border-border/30 text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      {algo === 'boyer_moore' ? 'Boyer-Moore' : algo === 'horspool' ? "Horspool's" : 'Naive'}
+                      {algo === 'boyer_moore' ? 'Boyer-Moore' : algo === 'horspool' ? "Horspool's" : algo === 'kmp' ? 'KMP' : 'Naive'}
                     </button>
                   ))}
                 </div>
@@ -267,6 +355,11 @@ export default function StringMatchingPage() {
                     <p className="text-muted-foreground">
                       Step Status: <span className={`font-bold uppercase ${activeStep.status === 'match' ? 'text-green-400' : 'text-red-400'}`}>{activeStep.status}</span>
                     </p>
+                    {activeStep.explain && (
+                      <p className="text-muted-foreground bg-primary/5 border border-primary/15 rounded p-2 leading-relaxed">
+                        <span className="font-bold text-foreground">Why: </span>{activeStep.explain}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2 text-xs">
@@ -300,6 +393,23 @@ export default function StringMatchingPage() {
                 </div>
               )}
 
+              {results[selectedAlgo]?.lps && (
+                <div className="p-4 bg-background/20 rounded-lg border border-border/20 space-y-3">
+                  <h4 className="text-xs font-bold text-primary uppercase tracking-wider">KMP Failure Table (LPS — Longest Proper Prefix that is also a Suffix)</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {results[selectedAlgo].lps.map((v: number, idx: number) => (
+                      <div key={idx} className="p-2 bg-card/60 border border-border/20 rounded text-center text-xs font-mono min-w-[44px]">
+                        <div className="text-muted-foreground">{pattern[idx] ?? '?'}<span className="text-[9px] opacity-60">[{idx}]</span></div>
+                        <div className="font-bold text-accent">{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    On a mismatch at pattern index <span className="font-mono">j</span>, KMP jumps to <span className="font-mono">lps[j-1]</span> instead of restarting — the text pointer never moves backwards, guaranteeing O(N + M).
+                  </p>
+                </div>
+              )}
+
               {results[selectedAlgo]?.bad_char_table && (
                 <div className="p-4 bg-background/20 rounded-lg border border-border/20 space-y-3">
                   <h4 className="text-xs font-bold text-primary uppercase tracking-wider">Boyer-Moore Bad Character Shifts (Last Index)</h4>
@@ -315,6 +425,66 @@ export default function StringMatchingPage() {
               )}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Theory & Study Guide */}
+      <div className="mt-12 bg-card/50 backdrop-blur-md border border-border/30 rounded-lg p-8">
+        <h2 className="text-2xl font-bold text-primary mb-6 flex items-center gap-2 border-b border-border/20 pb-4">
+          <Info className="w-6 h-6" /> Theory & Study Guide: String Matching
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Algorithm Overview</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                String matching algorithms search for the occurrence(s) of a "pattern" (length $M$) within a longer "text" (length $N$). Advanced algorithms use heuristics to skip unnecessary character comparisons.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Algorithmic Paradigm</h3>
+              <div className="inline-block px-3 py-1 bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase rounded-md mb-2">Input Enhancement (Space-Time Tradeoff)</div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Unlike Naive search, Horspool's and Boyer-Moore use an <strong className="text-foreground">Input Enhancement</strong> strategy. They pre-process the pattern to create shift tables (using $O(K)$ extra space) which then allow the algorithm to skip over large chunks of the text during the search phase.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Complexity Envelope</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><strong className="text-foreground">Naive Search:</strong> <span className="font-mono text-accent">O((N - M + 1) \cdot M)</span> worst case. Compares character by character.</li>
+                <li><strong className="text-foreground">Horspool's:</strong> <span className="font-mono text-accent">O(N)</span> average. Uses the Bad Symbol heuristic.</li>
+                <li><strong className="text-foreground">Boyer-Moore:</strong> <span className="font-mono text-accent">O(N / M)</span> best case! Combines Bad Symbol + Good Suffix heuristics. In English text, it often skips entirely past mismatches.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Step-by-Step Mechanisms</h3>
+              
+              <div className="mb-4">
+                <strong className="text-accent text-sm block mb-1">Horspool's Shift Table</strong>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                  <li>Pre-process the pattern to calculate a Shift Table mapping every character in the alphabet.</li>
+                  <li>Shift distance = Distance from the character's last occurrence to the end of the pattern (excluding the very last character).</li>
+                  <li>Default shift for characters not in the pattern is $M$ (length of pattern).</li>
+                  <li>During search, compare characters from <strong className="text-foreground">right to left</strong>. On mismatch, look up the mismatched text character in the Shift Table to know how far to slide the pattern.</li>
+                </ul>
+              </div>
+
+              <div>
+                <strong className="text-accent text-sm block mb-1">Boyer-Moore Heuristics</strong>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                  <li><strong className="text-foreground">Bad Character:</strong> If the text character doesn't match, shift the pattern so that the mismatching character aligns with its last occurrence in the pattern.</li>
+                  <li><strong className="text-foreground">Good Suffix:</strong> If a substring matches before a mismatch occurs, shift the pattern to align with the next occurrence of that matched "good suffix" within the pattern itself.</li>
+                  <li>Boyer-Moore takes the maximum shift recommended by both heuristics!</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

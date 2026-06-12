@@ -22,6 +22,7 @@ interface RecursionStep {
 
 export default function RecursionTreePage() {
   const [fibN, setFibN] = useState<number>(5)
+  const [inputType, setInputType] = useState<'automatic' | 'manual'>('automatic')
   const [loading, setLoading] = useState<boolean>(false)
   const [results, setResults] = useState<any>(null)
   
@@ -39,7 +40,7 @@ export default function RecursionTreePage() {
     stopPlayback()
 
     try {
-      const response = await fetch('http://localhost:8000/recursion-trace', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/recursion-trace`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ n: fibN })
@@ -194,22 +195,56 @@ export default function RecursionTreePage() {
             </h3>
 
             <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1.5">
-                  Fibonacci Value ($N$): <span className="text-accent font-bold">{fibN}</span>
-                </label>
-                <input
-                  type="range"
-                  min="2"
-                  max="8"
-                  value={fibN}
-                  onChange={(e) => setFibN(parseInt(e.target.value))}
-                  className="w-full accent-primary bg-background h-2 rounded-lg mb-2"
-                />
-                <span className="text-[10px] text-muted-foreground italic leading-relaxed block">
-                  Bounded to n=8 to avoid call tree coordinates collapsing in visual overlays.
-                </span>
+              <div className="flex bg-background/50 p-1 rounded-lg border border-border/20 mb-4">
+                <button
+                  onClick={() => setInputType('automatic')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${inputType === 'automatic' ? 'bg-primary text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Safe Range
+                </button>
+                <button
+                  onClick={() => setInputType('manual')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${inputType === 'manual' ? 'bg-primary text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Custom Manual
+                </button>
               </div>
+
+              {inputType === 'automatic' ? (
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1.5">
+                    Fibonacci Value ($N$): <span className="text-accent font-bold">{fibN}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="2"
+                    max="8"
+                    value={fibN}
+                    onChange={(e) => setFibN(parseInt(e.target.value))}
+                    className="w-full accent-primary bg-background h-2 rounded-lg mb-2"
+                  />
+                  <span className="text-[10px] text-muted-foreground italic leading-relaxed block">
+                    Bounded to n=8 to avoid call tree coordinates collapsing in visual overlays.
+                  </span>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1.5">
+                    Fibonacci Value ($N$):
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="15"
+                    value={fibN}
+                    onChange={(e) => setFibN(parseInt(e.target.value) || 1)}
+                    className="w-full bg-background border border-border/30 rounded-lg p-3 font-mono text-sm focus:outline-none focus:border-primary/50 text-foreground mb-2"
+                  />
+                  <span className="text-[10px] text-muted-foreground italic leading-relaxed block">
+                    Warning: Values &gt; 8 may cause extreme layout crowding or performance lag in the visualizer.
+                  </span>
+                </div>
+              )}
 
               <button
                 onClick={handleSolve}
@@ -354,7 +389,7 @@ export default function RecursionTreePage() {
                 <div className="bg-black/60 rounded-lg border border-border/15 p-4 flex justify-center relative overflow-hidden">
                   <svg viewBox="0 0 620 340" className="w-full h-auto max-w-[620px] select-none font-sans">
                     {/* Render tree connections */}
-                    {activeStep && activeStep.nodes_state.map((node) => {
+                    {activeStep && activeStep.nodes_state.map((node: any) => {
                       if (!node.parent_id) return null
                       const parentPos = nodePositions[node.parent_id]
                       const childPos = nodePositions[node.id]
@@ -375,7 +410,7 @@ export default function RecursionTreePage() {
                     })}
 
                     {/* Render tree nodes */}
-                    {activeStep && activeStep.nodes_state.map((node) => {
+                    {activeStep && activeStep.nodes_state.map((node: any) => {
                       const pos = nodePositions[node.id]
                       if (!pos) return null
 
@@ -420,6 +455,65 @@ export default function RecursionTreePage() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Theory & Study Guide */}
+      <div className="mt-12 bg-card/50 backdrop-blur-md border border-border/30 rounded-lg p-8">
+        <h2 className="text-2xl font-bold text-primary mb-6 flex items-center gap-2 border-b border-border/20 pb-4">
+          <Info className="w-6 h-6" /> Theory & Study Guide: Recursion & Dynamic Programming
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Concept Overview</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Recursion occurs when a function calls itself to solve smaller instances of the same problem. While elegant, naive recursion often recalculates the same subproblems repeatedly, leading to massive inefficiencies (an exponential call tree).
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Algorithmic Paradigm</h3>
+              <div className="inline-block px-3 py-1 bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase rounded-md mb-2">Dynamic Programming (Top-Down)</div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Dynamic Programming (DP) optimizes recursion. By using <strong>Memoization</strong> (caching the results of expensive function calls), DP ensures that each unique subproblem is only solved once.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Complexity Envelope</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><strong className="text-foreground">Naive Recursion (Fibonacci):</strong> Time <span className="font-mono text-red-400">O(2^N)</span> | Space <span className="font-mono text-accent">O(N)</span> for the call stack.</li>
+                <li><strong className="text-foreground">Memoized DP (Fibonacci):</strong> Time <span className="font-mono text-green-400">O(N)</span> | Space <span className="font-mono text-accent">O(N)</span> for the call stack + cache dictionary.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Step-by-Step Mechanisms</h3>
+              
+              <div className="mb-4">
+                <strong className="text-accent text-sm block mb-1">The Call Stack</strong>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                  <li>When a recursive function is called, a new "Stack Frame" is pushed onto the system's memory stack.</li>
+                  <li>This frame contains local variables and the return address.</li>
+                  <li>When the base case (e.g., $n \le 1$) is hit, the function returns, popping the frame off the stack.</li>
+                </ul>
+              </div>
+
+              <div>
+                <strong className="text-accent text-sm block mb-1">Memoization Pruning</strong>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                  <li>Initialize an empty cache (hash map or array).</li>
+                  <li>At the start of the function, check if the current input $N$ exists in the cache.</li>
+                  <li>If it does, return the cached value immediately (<strong className="text-blue-400">Cache Hit</strong>). This prunes an entire branch of the recursion tree!</li>
+                  <li>If it doesn't, perform the recursive calls, save the result to the cache, and then return it.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

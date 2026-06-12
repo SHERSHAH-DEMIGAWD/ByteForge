@@ -11,6 +11,7 @@ export interface AlgorithmResult {
   sequences?: any[]
   intermediate?: any
   payload_base64?: string
+  error?: string
 }
 
 export interface CompressionResult {

@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { Play, Pause, ChevronLeft, ChevronRight, Shuffle, RefreshCw, BarChart2, Info, CheckCircle2 } from 'lucide-react'
+import { ShareButton } from '@/components/share-button'
+import { ExportReportButton } from '@/components/export-report'
+import { useSharedParams } from '@/lib/share'
 
 interface SortStep {
   array: number[]
@@ -24,6 +27,7 @@ interface SortStep {
 
 export default function SortingLabPage() {
   const [inputArrayStr, setInputArrayStr] = useState<string>('34, 8, 64, 51, 32, 21, 9, 15')
+  const [inputType, setInputType] = useState<'automatic' | 'manual'>('automatic')
   const [arraySize, setArraySize] = useState<number>(8)
   const [loading, setLoading] = useState<boolean>(false)
   const [selectedAlgo, setSelectedAlgo] = useState<'quick' | 'merge' | 'heap' | 'counting' | 'bubble' | 'selection'>('quick')
@@ -37,6 +41,19 @@ export default function SortingLabPage() {
   
   // Benchmark comparison results
   const [benchmarkResults, setBenchmarkResults] = useState<any>(null)
+
+  // Restore inputs from a shared link (?arr=34,8,64&algo=quick)
+  useSharedParams((params) => {
+    const arr = params.get('arr')
+    if (arr) {
+      setInputArrayStr(arr.split(',').map((x) => x.trim()).filter(Boolean).join(', '))
+      setInputType('manual')
+    }
+    const algo = params.get('algo')
+    if (algo && ['quick', 'merge', 'heap', 'counting', 'bubble', 'selection'].includes(algo)) {
+      setSelectedAlgo(algo as any)
+    }
+  })
 
   const generateRandomArray = () => {
     const arr = Array.from({ length: arraySize }, () => Math.floor(Math.random() * 80) + 10)
@@ -68,7 +85,7 @@ export default function SortingLabPage() {
     stopPlayback()
 
     try {
-      const response = await fetch('http://localhost:8000/sorting-trace', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/sorting-trace`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ array: arr })
@@ -270,13 +287,46 @@ export default function SortingLabPage() {
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent mb-2">
-          Sorting Algorithm Laboratory
-        </h1>
-        <p className="text-muted-foreground">
-          Study Unit I & II Brute Force, Divide & Conquer, and Transform & Conquer sorting paradigms with empirical benchmarking.
-        </p>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent mb-2">
+            Sorting Algorithm Laboratory
+          </h1>
+          <p className="text-muted-foreground">
+            Study Unit I & II Brute Force, Divide & Conquer, and Transform & Conquer sorting paradigms with empirical benchmarking.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <ShareButton state={{ arr: getArrayFromInput().join(','), algo: selectedAlgo }} />
+          <ExportReportButton
+            disabled={!benchmarkResults}
+            getReport={() => ({
+              title: 'Sorting Laboratory Benchmark Report',
+              subtitle: `Input array: [${getArrayFromInput().join(', ')}]`,
+              metrics: [
+                { label: 'Array Size', value: getArrayFromInput().length },
+                { label: 'Algorithms Compared', value: Object.keys(benchmarkResults || {}).length },
+              ],
+              tables: [
+                {
+                  title: 'Empirical Benchmark Comparison',
+                  headers: ['Algorithm', 'Paradigm', 'Avg Complexity', 'Worst Case', 'Trace Steps'],
+                  rows: Object.entries(benchmarkResults || {}).map(([algo, item]: any) => [
+                    `${algo.charAt(0).toUpperCase()}${algo.slice(1)} Sort`,
+                    item.paradigm,
+                    item.complexity,
+                    item.worst,
+                    item.steps,
+                  ]),
+                },
+              ],
+              notes: [
+                'Trace steps count the engine-generated visualization frames; fewer steps reflect fewer comparisons/swaps on this dataset.',
+                'Counting Sort bypasses the O(N log N) comparison lower bound via a space-time tradeoff.',
+              ],
+            })}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -288,38 +338,54 @@ export default function SortingLabPage() {
             </h3>
 
             <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1.5">Array Input (Comma Separated)</label>
-                <input
-                  type="text"
-                  value={inputArrayStr}
-                  onChange={(e) => setInputArrayStr(e.target.value)}
-                  className="w-full bg-background border border-border/30 rounded-lg p-3 font-mono text-sm focus:outline-none focus:border-primary/50 text-foreground"
-                />
+              <div className="flex bg-background/50 p-1 rounded-lg border border-border/20 mb-4">
+                <button
+                  onClick={() => setInputType('automatic')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${inputType === 'automatic' ? 'bg-primary text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Random Generator
+                </button>
+                <button
+                  onClick={() => setInputType('manual')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${inputType === 'manual' ? 'bg-primary text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Manual Array
+                </button>
               </div>
 
-              {/* Slider for random size */}
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1.5">
-                  Random Array Size: <span className="text-accent font-bold">{arraySize}</span>
-                </label>
-                <div className="flex gap-4 items-center">
+              {inputType === 'manual' ? (
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1.5">Array Input (Comma Separated)</label>
                   <input
-                    type="range"
-                    min="5"
-                    max="20"
-                    value={arraySize}
-                    onChange={(e) => setArraySize(parseInt(e.target.value))}
-                    className="flex-1 accent-primary bg-background h-2 rounded-lg"
+                    type="text"
+                    value={inputArrayStr}
+                    onChange={(e) => setInputArrayStr(e.target.value)}
+                    className="w-full bg-background border border-border/30 rounded-lg p-3 font-mono text-sm focus:outline-none focus:border-primary/50 text-foreground"
                   />
-                  <button
-                    onClick={generateRandomArray}
-                    className="p-2.5 bg-background border border-border/30 hover:border-primary/50 rounded-lg text-muted-foreground hover:text-foreground transition-all flex items-center justify-center gap-1.5 text-xs font-bold"
-                  >
-                    <Shuffle className="w-3.5 h-3.5" /> Generate
-                  </button>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase block mb-1.5">
+                    Random Array Size: <span className="text-accent font-bold">{arraySize}</span>
+                  </label>
+                  <div className="flex gap-4 items-center">
+                    <input
+                      type="range"
+                      min="5"
+                      max="20"
+                      value={arraySize}
+                      onChange={(e) => setArraySize(parseInt(e.target.value))}
+                      className="flex-1 accent-primary bg-background h-2 rounded-lg"
+                    />
+                    <button
+                      onClick={generateRandomArray}
+                      className="p-2.5 bg-background border border-border/30 hover:border-primary/50 rounded-lg text-muted-foreground hover:text-foreground transition-all flex items-center justify-center gap-1.5 text-xs font-bold"
+                    >
+                      <Shuffle className="w-3.5 h-3.5" /> Generate
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <button
                 onClick={handleFetchTraces}
@@ -526,6 +592,62 @@ export default function SortingLabPage() {
               )}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Theory & Study Guide */}
+      <div className="mt-12 bg-card/50 backdrop-blur-md border border-border/30 rounded-lg p-8">
+        <h2 className="text-2xl font-bold text-primary mb-6 flex items-center gap-2 border-b border-border/20 pb-4">
+          <Info className="w-6 h-6" /> Theory & Study Guide: Sorting Paradigms
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Algorithm Overview</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Sorting is the process of rearranging a sequence of objects so as to put them in some logical order. Different algorithms employ distinct paradigms that trade off time complexity, space complexity, and stability.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Algorithmic Paradigms</h3>
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li>
+                  <strong className="text-foreground">Brute Force:</strong> <span className="text-accent">Bubble / Selection</span>. Simple, exhaustive iterative scanning. $O(N^2)$ time. Good for tiny datasets.
+                </li>
+                <li>
+                  <strong className="text-foreground">Divide & Conquer:</strong> <span className="text-accent">Quick / Merge</span>. Break the array into smaller chunks, sort them, and combine. $O(N \log N)$ time. Industry standard (e.g. V8 engine uses Timsort/Quicksort).
+                </li>
+                <li>
+                  <strong className="text-foreground">Transform & Conquer:</strong> <span className="text-accent">Heap Sort</span>. Build a specialized data structure (a Max-Heap), then repeatedly extract the largest element. $O(N \log N)$ time with $O(1)$ space.
+                </li>
+                <li>
+                  <strong className="text-foreground">Space-Time Tradeoffs:</strong> <span className="text-accent">Counting Sort</span>. Forgoes comparison entirely. Tallies frequencies in an auxiliary array to bypass the $O(N \log N)$ comparison limit, running in linear $O(N+K)$ time but using $O(K)$ space.
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Key Properties to Remember</h3>
+              
+              <div className="mb-4">
+                <strong className="text-accent text-sm block mb-1">Stability</strong>
+                <p className="text-sm text-muted-foreground">
+                  A sorting algorithm is <strong className="text-foreground">stable</strong> if it preserves the relative order of equal elements. Merge Sort, Bubble Sort, and Counting Sort are stable. Quick Sort and Heap Sort are inherently unstable.
+                </p>
+              </div>
+
+              <div>
+                <strong className="text-accent text-sm block mb-1">In-Place Sorting</strong>
+                <p className="text-sm text-muted-foreground">
+                  An <strong className="text-foreground">in-place</strong> algorithm requires a small, constant amount of extra memory space $O(1)$. Bubble, Selection, and Heap sort are in-place. Merge Sort requires $O(N)$ extra space to merge sub-arrays. Counting Sort requires $O(K)$ extra space.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
