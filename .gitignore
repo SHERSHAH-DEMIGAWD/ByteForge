@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Node / Next.js
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/.vercel/
+
+# Env files
+.env
+.env.local
+frontend/.env.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+report/*.pdf

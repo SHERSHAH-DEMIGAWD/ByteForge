@@ -1,0 +1,14 @@
+# Render.com blueprint for the ByteForge FastAPI backend.
+# In the Render dashboard: New + > Blueprint > connect this repo.
+# After the frontend is deployed on Vercel, set ALLOWED_ORIGINS to its URL.
+services:
+  - type: web
+    name: byteforge-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-api.txt
+    startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ALLOWED_ORIGINS
+        sync: false  # set this to your Vercel URL, e.g. https://byteforge.vercel.app

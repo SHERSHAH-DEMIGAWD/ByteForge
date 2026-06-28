@@ -38,14 +38,25 @@ from algorithms.recursion import get_fibonacci_naive_trace, get_fibonacci_memoiz
 
 app = FastAPI(title="ByteForge Compression API")
 
-# Enable CORS for Next.js frontend
+# Enable CORS for the Next.js frontend.
+# In production set ALLOWED_ORIGINS to a comma-separated list of frontend URLs,
+# e.g. ALLOWED_ORIGINS="https://byteforge.vercel.app". Defaults to localhost for dev.
+import os
+_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000")
+allowed_origins = [o.strip() for o in _origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/health")
+async def health():
+    """Lightweight liveness probe for deployment platforms and the frontend status check."""
+    return {"status": "ok", "service": "byteforge-api"}
+
 
 class CompressRequest(BaseModel):
     data: str

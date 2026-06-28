@@ -1,0 +1,6 @@
+# Backend (FastAPI) dependencies for the ByteForge REST API (api.py).
+# The algorithm engine itself uses only the Python standard library.
+# Install with:  pip install -r requirements-api.txt
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.6.0
