@@ -22,13 +22,33 @@ import {
   Crosshair,
   Table2,
   Crown,
-  Grid3X3
+  Grid3X3,
+  Compass,
+  MapPin,
+  Package,
+  MessageSquare
 } from 'lucide-react'
 
 const coreLinks = [
   { href: '/', label: 'Dashboard', icon: Home },
   { href: '/decoder', label: 'The Decoder Node', icon: Unlock },
   { href: '/viva-guide', label: 'DAA Viva Sandbox', icon: GraduationCap },
+]
+
+// Layer 2 — Self-Determined Learning (Heutagogy). The personalized learning hub.
+const learningLinks = [
+  { href: '/learn', label: 'Learning Hub', icon: Compass },
+  { href: '/learn/roadmap', label: 'Roadmap', icon: MapPin },
+  { href: '/learn/skill-tree', label: 'Skill Tree', icon: GitFork },
+  { href: '/learn/continue', label: 'Continue Learning', icon: BookOpen },
+  { href: '/learn/progress', label: 'Progress & Analytics', icon: Activity },
+]
+
+// Layer 3 — Experiential Learning. Real-world applications of core algorithms.
+const realWorldLinks = [
+  { href: '/real-world/google-maps', label: 'Google Maps · Dijkstra', icon: MapPin },
+  { href: '/real-world/amazon-logistics', label: 'Amazon · Knapsack', icon: Package },
+  { href: '/real-world/whatsapp', label: 'WhatsApp · Huffman', icon: MessageSquare },
 ]
 
 const algoLinks = [
@@ -94,6 +114,20 @@ export function Sidebar() {
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-2">Core Hub</p>
           <div className="space-y-1">
             {coreLinks.map(renderLink)}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-bold text-accent uppercase tracking-wider mb-2 px-2">Learning · Layer 2</p>
+          <div className="space-y-1">
+            {learningLinks.map(renderLink)}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-bold text-accent uppercase tracking-wider mb-2 px-2">Real-World Labs · Layer 3</p>
+          <div className="space-y-1">
+            {realWorldLinks.map(renderLink)}
           </div>
         </div>
 
