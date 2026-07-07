@@ -50,6 +50,12 @@ _MAX_EVENTS_PER_SESSION = 50
 # threshold — Layer 2 can replace it with an adaptive model.
 _MASTERY_THRESHOLD = 70
 
+# Public alias of the mastery threshold. Layer 2 (``heutagogy``) imports this so
+# it shares a single, stable cutoff with Layer 1 instead of reaching for the
+# underscored internal or hard-coding its own number. Additive; no behaviour
+# change — ``_MASTERY_THRESHOLD`` remains the value used throughout this module.
+MASTERY_THRESHOLD = _MASTERY_THRESHOLD
+
 
 # A curated catalogue of DAA topics used to suggest *unexplored* material. It is
 # intentionally broader than the offline provider's explainable knowledge base
@@ -361,6 +367,12 @@ def _normalize_topic(topic: str) -> str:
     recorded here land on the same key.
     """
     return "".join(ch for ch in (topic or "").lower() if ch.isalnum())
+
+
+# Public alias so Layer 2 keys topics identically to Layer 1 (e.g. a skill-graph
+# node and a recorded explanation collapse to the same key). Additive; the
+# underscored name stays in use internally.
+normalize_topic = _normalize_topic
 
 
 def _clean_session_id(session_id: str) -> str:

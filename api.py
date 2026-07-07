@@ -546,3 +546,15 @@ from ai.routes import router as ai_router
 app.include_router(ai_router)
 
 
+# ---------------------------------------------------------------------------
+# Self-Determined Learning (Heutagogy) — Layer 2
+# ---------------------------------------------------------------------------
+# Mounts the /learn/* endpoints defined in the sibling `heutagogy` package. Like
+# the AI router above this is additive: it does not alter any endpoint, and it
+# depends on Layer 1 (the `ai` package) one-directionally. Runs offline with no
+# API key by default.
+from heutagogy.routes import router as learn_router
+
+app.include_router(learn_router)
+
+
