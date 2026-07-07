@@ -535,3 +535,14 @@ async def recursion_endpoint(req: RecursionRequest):
         raise HTTPException(status_code=500, detail=f"Recursion trace error: {str(e)}")
 
 
+# ---------------------------------------------------------------------------
+# AI Learning Infrastructure (Layer 1)
+# ---------------------------------------------------------------------------
+# Mounts the /ai/* endpoints (health, explain, assess, recommend) defined in the
+# sibling `ai` package. This is additive: it does not alter any endpoint above.
+# The AI layer runs offline with no API key by default (see ai/provider.py).
+from ai.routes import router as ai_router
+
+app.include_router(ai_router)
+
+

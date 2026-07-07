@@ -23,3 +23,6 @@ Thumbs.db
 
 # Build artifacts
 report/*.pdf
+
+# AI learner-context persistence (Layer 1)
+ai_data/
