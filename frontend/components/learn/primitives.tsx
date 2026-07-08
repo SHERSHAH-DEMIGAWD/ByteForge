@@ -10,7 +10,7 @@
  */
 
 import type { SkillStatus } from '@/lib/learn-api'
-import { CheckCircle2, Circle, Lock, Loader2 } from 'lucide-react'
+import { CheckCircle2, Circle, Lock, Loader2, Signal, SignalHigh, SignalMedium } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Status vocabulary — one source of truth for colour + label + icon per status.
@@ -159,4 +159,98 @@ export function formatMinutes(min: number): string {
   const h = Math.floor(min / 60)
   const m = min % 60
   return h ? `${h}h ${m}m` : `${m}m`
+}
+
+// ---------------------------------------------------------------------------
+// Difficulty badge — colour-coded, with a graceful fallback for unknown labels.
+// ---------------------------------------------------------------------------
+
+const DIFFICULTY_META: Record<string, { text: string; bg: string; border: string; icon: any }> = {
+  beginner: { text: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/25', icon: SignalMedium },
+  easy: { text: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/25', icon: SignalMedium },
+  intermediate: { text: 'text-amber-500', bg: 'bg-amber-500/10', border: 'border-amber-500/25', icon: SignalHigh },
+  advanced: { text: 'text-rose-500', bg: 'bg-rose-500/10', border: 'border-rose-500/25', icon: Signal },
+  hard: { text: 'text-rose-500', bg: 'bg-rose-500/10', border: 'border-rose-500/25', icon: Signal },
+}
+
+export function DifficultyBadge({ difficulty }: { difficulty: string }) {
+  const key = (difficulty || '').toLowerCase()
+  const m = DIFFICULTY_META[key] ?? {
+    text: 'text-muted-foreground',
+    bg: 'bg-muted/40',
+    border: 'border-border',
+    icon: Signal,
+  }
+  const Icon = m.icon
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border capitalize ${m.text} ${m.bg} ${m.border}`}
+    >
+      <Icon className="w-3 h-3" />
+      {difficulty || 'General'}
+    </span>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// A single consistent section heading (icon + uppercase label) reused across
+// every learn page so headings never drift apart visually.
+// ---------------------------------------------------------------------------
+
+export function SectionHeading({
+  icon: Icon,
+  children,
+  iconClass = 'text-primary',
+  action,
+}: {
+  icon: any
+  children: React.ReactNode
+  iconClass?: string
+  action?: React.ReactNode
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 mb-4">
+      <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+        <Icon className={`w-4 h-4 ${iconClass}`} />
+        {children}
+      </h3>
+      {action}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Empty state — a friendly, centered placeholder so no card ever renders blank.
+// ---------------------------------------------------------------------------
+
+export function EmptyState({
+  icon: Icon,
+  title,
+  hint,
+  tone = 'text-muted-foreground/50',
+  className = '',
+}: {
+  icon: any
+  title: string
+  hint?: string
+  tone?: string
+  className?: string
+}) {
+  return (
+    <div className={`flex flex-col items-center justify-center text-center py-8 px-4 ${className}`}>
+      <div className="w-11 h-11 rounded-xl bg-muted/40 border border-border/60 flex items-center justify-center mb-3">
+        <Icon className={`w-5 h-5 ${tone}`} />
+      </div>
+      <p className="text-sm font-medium text-foreground">{title}</p>
+      {hint && <p className="text-xs text-muted-foreground mt-1 max-w-xs">{hint}</p>}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Skeleton block — shimmering placeholder for loading states.
+// ---------------------------------------------------------------------------
+
+export function Skeleton({ className = '' }: { className?: string }) {
+  return <div className={`bf-skeleton rounded-xl ${className}`} />
 }

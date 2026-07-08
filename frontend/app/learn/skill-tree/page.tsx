@@ -5,10 +5,11 @@
  *
  * Renders the skill DAG (/learn/skill-graph) as a layered SVG graph: nodes are
  * placed in topological "levels" (longest-path depth from a root), edges drawn as
- * curved prerequisite links, each node coloured by the learner's status. Clicking
- * a node opens a detail panel with mastery, the placement reason, blocking
- * prerequisites, and a deep-link into its lab. Layout is computed purely from the
- * returned nodes/edges — no hard-coded positions — so it adapts if the graph grows.
+ * curved prerequisite links, each node coloured by the learner's status. Hovering
+ * a node lifts it and highlights its prerequisite links; clicking opens a detail
+ * panel with mastery, the placement reason, blocking prerequisites, and a
+ * deep-link into its lab. Layout is computed purely from the returned nodes/edges
+ * — no hard-coded positions — so it adapts if the graph grows.
  */
 
 import Link from 'next/link'
@@ -19,19 +20,21 @@ import {
   StatusBadge,
   MasteryBar,
   ConfidenceMeter,
+  DifficultyBadge,
   CATEGORY_LABEL,
   formatMinutes,
+  Skeleton,
 } from '@/components/learn/primitives'
 import type { SkillNode } from '@/lib/learn-api'
-import { PlayCircle, Lock, X, Info, ArrowRight } from 'lucide-react'
+import { PlayCircle, Lock, X, Info, ArrowRight, MousePointerClick } from 'lucide-react'
 
 // Visual constants for the SVG canvas.
-const COL_W = 210
-const ROW_H = 96
-const NODE_W = 168
-const NODE_H = 62
-const PAD_X = 40
-const PAD_Y = 40
+const COL_W = 220
+const ROW_H = 104
+const NODE_W = 176
+const NODE_H = 66
+const PAD_X = 44
+const PAD_Y = 44
 
 interface Placed extends SkillNode {
   x: number
@@ -50,9 +53,18 @@ const NODE_COLORS: Record<string, { fill: string; stroke: string; text: string }
 export default function SkillTreePage() {
   const { skillGraph, error } = useLearningStore()
   const [selected, setSelected] = useState<string | null>(null)
+  const [hovered, setHovered] = useState<string | null>(null)
 
-  const { placed, edges, width, height, byTopic } = useMemo(() => {
-    if (!skillGraph) return { placed: [] as Placed[], edges: [] as [string, string][], width: 800, height: 400, byTopic: {} as Record<string, Placed> }
+  const { placed, edges, width, height, byTopic, counts } = useMemo(() => {
+    const empty = {
+      placed: [] as Placed[],
+      edges: [] as [string, string][],
+      width: 800,
+      height: 400,
+      byTopic: {} as Record<string, Placed>,
+      counts: { mastered: 0, in_progress: 0, available: 0, locked: 0 },
+    }
+    if (!skillGraph) return empty
 
     const nodes = skillGraph.nodes
     const edgeList = skillGraph.edges
@@ -106,37 +118,55 @@ export default function SkillTreePage() {
     const maxLevel = Math.max(...Object.values(level), 0)
     const w = PAD_X * 2 + maxLevel * COL_W + NODE_W
     const h = PAD_Y * 2 + maxRows * ROW_H
-    return { placed: placedNodes, edges: edgeList, width: w, height: h, byTopic: map }
+
+    const counts = { mastered: 0, in_progress: 0, available: 0, locked: 0 }
+    nodes.forEach((n) => {
+      if (n.status in counts) counts[n.status as keyof typeof counts]++
+    })
+
+    return { placed: placedNodes, edges: edgeList, width: w, height: h, byTopic: map, counts }
   }, [skillGraph])
 
   if (error && !skillGraph) {
     return <p className="text-center text-sm text-muted-foreground mt-16">Couldn&apos;t load skill graph: {error}</p>
   }
   if (!skillGraph) {
-    return <div className="max-w-6xl mx-auto h-[500px] rounded-2xl border border-border bg-card animate-pulse" />
+    return (
+      <div className="max-w-6xl mx-auto space-y-4">
+        <Skeleton className="h-16" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <Skeleton className="lg:col-span-2 h-[500px]" />
+          <Skeleton className="h-[500px]" />
+        </div>
+      </div>
+    )
   }
 
   const selectedNode = selected ? byTopic[selected] : null
+  const focus = hovered ?? selected
 
   return (
     <div className="max-w-6xl mx-auto space-y-4">
-      {/* Legend */}
-      <div className="flex items-center gap-4 flex-wrap text-xs">
+      {/* Legend + summary */}
+      <div className="bf-card bf-rise p-4 flex items-center gap-x-6 gap-y-3 flex-wrap">
         {(['mastered', 'in_progress', 'available', 'locked'] as const).map((s) => (
-          <span key={s} className="inline-flex items-center gap-1.5">
+          <span key={s} className="inline-flex items-center gap-2 text-xs">
             <span
               className="w-3 h-3 rounded-full border-2"
               style={{ background: NODE_COLORS[s].fill, borderColor: NODE_COLORS[s].stroke }}
             />
             <span className="text-muted-foreground">{STATUS_META[s].label}</span>
+            <span className="font-semibold text-foreground tabular-nums">{counts[s]}</span>
           </span>
         ))}
-        <span className="text-muted-foreground/60 ml-auto hidden sm:inline">Click a node for details →</span>
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/70 ml-auto">
+          <MousePointerClick className="w-3.5 h-3.5" /> Hover to trace prerequisites · click for details
+        </span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Graph canvas */}
-        <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-2 overflow-auto custom-scrollbar">
+        <div className="lg:col-span-2 bf-card p-2 overflow-auto custom-scrollbar">
           <svg width={width} height={height} className="min-w-full">
             {/* Edges */}
             {edges.map(([a, b], i) => {
@@ -148,15 +178,17 @@ export default function SkillTreePage() {
               const x2 = to.x
               const y2 = to.y + NODE_H / 2
               const midX = (x1 + x2) / 2
-              const active = selected === a || selected === b
+              const active = focus === a || focus === b
+              const dim = focus && !active
               return (
                 <path
                   key={i}
                   d={`M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`}
                   fill="none"
-                  stroke={active ? '#3b82f6' : 'var(--border)'}
+                  stroke={active ? 'var(--primary)' : 'var(--border)'}
                   strokeWidth={active ? 2.5 : 1.5}
-                  opacity={active ? 1 : 0.55}
+                  opacity={dim ? 0.18 : active ? 1 : 0.5}
+                  className="transition-all duration-200"
                 />
               )
             })}
@@ -165,35 +197,55 @@ export default function SkillTreePage() {
             {placed.map((n) => {
               const c = NODE_COLORS[n.status] ?? NODE_COLORS.locked
               const isSel = selected === n.topic
+              const isHover = hovered === n.topic
+              const dim = focus && focus !== n.topic && !edgeTouches(edges, focus, n.topic)
               return (
                 <g
                   key={n.topic}
                   transform={`translate(${n.x}, ${n.y})`}
-                  className="cursor-pointer"
+                  className="cursor-pointer transition-all duration-200"
+                  style={{ opacity: dim ? 0.4 : 1 }}
                   onClick={() => setSelected(n.topic === selected ? null : n.topic)}
+                  onMouseEnter={() => setHovered(n.topic)}
+                  onMouseLeave={() => setHovered(null)}
                 >
+                  <title>
+                    {n.title} — {STATUS_META[n.status].label}
+                    {n.mastery > 0 ? ` (${Math.round(n.mastery)}% mastery)` : ''}
+                  </title>
+                  {(isSel || isHover) && (
+                    <rect
+                      x={-3}
+                      y={-3}
+                      width={NODE_W + 6}
+                      height={NODE_H + 6}
+                      rx={15}
+                      fill="none"
+                      stroke="var(--primary)"
+                      strokeWidth={1}
+                      opacity={0.25}
+                    />
+                  )}
                   <rect
                     width={NODE_W}
                     height={NODE_H}
                     rx={12}
                     fill={c.fill}
-                    stroke={isSel ? '#3b82f6' : c.stroke}
-                    strokeWidth={isSel ? 3 : 1.5}
+                    stroke={isSel || isHover ? 'var(--primary)' : c.stroke}
+                    strokeWidth={isSel ? 3 : isHover ? 2.5 : 1.5}
+                    className="transition-all duration-200"
                   />
-                  <text x={12} y={24} fontSize={13} fontWeight={700} fill="var(--foreground)">
+                  <text x={14} y={26} fontSize={13} fontWeight={700} fill="var(--foreground)">
                     {truncate(n.title, 20)}
                   </text>
-                  <text x={12} y={44} fontSize={10} fill={c.text} fontWeight={600}>
+                  <text x={14} y={46} fontSize={10} fill={c.text} fontWeight={600}>
                     {STATUS_META[n.status].label}
                     {n.mastery > 0 ? ` · ${Math.round(n.mastery)}%` : ''}
                   </text>
                   {n.status === 'locked' && (
-                    <g transform={`translate(${NODE_W - 26}, 10)`}>
-                      <Lock className="w-3 h-3" />
-                      <text x={0} y={12} fontSize={13} fill={c.text}>
-                        🔒
-                      </text>
-                    </g>
+                    <text x={NODE_W - 24} y={24} fontSize={13} fill={c.text}>
+                      🔒
+                    </text>
                   )}
                 </g>
               )
@@ -202,14 +254,17 @@ export default function SkillTreePage() {
         </div>
 
         {/* Detail panel */}
-        <div className="rounded-2xl border border-border bg-card p-5 h-fit lg:sticky lg:top-40">
+        <div className="bf-card p-5 h-fit lg:sticky lg:top-44">
           {selectedNode ? (
             <NodeDetail node={selectedNode} onClose={() => setSelected(null)} />
           ) : (
             <div className="flex flex-col items-center justify-center text-center py-10">
-              <Info className="w-8 h-8 text-muted-foreground/40 mb-3" />
-              <p className="text-sm text-muted-foreground">
-                Select any node to see its mastery, prerequisites, and a direct link to the lab.
+              <div className="w-11 h-11 rounded-xl bg-muted/40 border border-border/60 flex items-center justify-center mb-3">
+                <Info className="w-5 h-5 text-muted-foreground/50" />
+              </div>
+              <p className="text-sm font-medium text-foreground">Select a node</p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                See its mastery, prerequisites, and a direct link to the lab.
               </p>
             </div>
           )}
@@ -219,18 +274,25 @@ export default function SkillTreePage() {
   )
 }
 
+function edgeTouches(edges: [string, string][], focus: string, topic: string): boolean {
+  return edges.some(([a, b]) => (a === focus && b === topic) || (b === focus && a === topic))
+}
+
 function NodeDetail({ node, onClose }: { node: Placed; onClose: () => void }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 bf-fade-in">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h3 className="text-lg font-bold text-foreground">{node.title}</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {CATEGORY_LABEL[node.category] ?? node.category} · {node.difficulty}
-            {node.estimated_minutes ? ` · ${formatMinutes(node.estimated_minutes)}` : ''}
-          </p>
+          <div className="flex items-center gap-2 flex-wrap mt-1.5">
+            <span className="text-xs text-muted-foreground">{CATEGORY_LABEL[node.category] ?? node.category}</span>
+            <DifficultyBadge difficulty={node.difficulty} />
+            {node.estimated_minutes ? (
+              <span className="text-xs text-muted-foreground">{formatMinutes(node.estimated_minutes)}</span>
+            ) : null}
+          </div>
         </div>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -241,7 +303,7 @@ function NodeDetail({ node, onClose }: { node: Placed; onClose: () => void }) {
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Mastery</span>
-            <span className="font-semibold text-foreground">{Math.round(node.mastery)}%</span>
+            <span className="font-semibold text-foreground tabular-nums">{Math.round(node.mastery)}%</span>
           </div>
           <MasteryBar value={node.mastery} />
           <ConfidenceMeter confidence={node.confidence} />
@@ -268,9 +330,10 @@ function NodeDetail({ node, onClose }: { node: Placed; onClose: () => void }) {
       {node.route && node.status !== 'locked' && (
         <Link
           href={node.route}
-          className="inline-flex items-center gap-2 w-full justify-center px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all"
+          className="inline-flex items-center gap-2 w-full justify-center px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all shadow-sm shadow-primary/25 group"
         >
-          <PlayCircle className="w-4 h-4" /> Open lab <ArrowRight className="w-4 h-4" />
+          <PlayCircle className="w-4 h-4" /> Open lab{' '}
+          <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
         </Link>
       )}
     </div>

@@ -149,15 +149,124 @@
   height: 6px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
+  background: transparent;
   border-radius: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 102, 255, 0.3);
+  background: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
   border-radius: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 170, 255, 0.5);
+  background: color-mix(in oklch, var(--primary) 55%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   Polish layer — shared motion, elevation, and surface utilities used across
+   the learning hub. Elegant-minimal: short, eased, subtle. Respects reduced-
+   motion preferences.
+   --------------------------------------------------------------------------- */
+
+@keyframes bf-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes bf-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes bf-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+/* Entrance helpers. Add .bf-stagger-N for a small cascade. */
+.bf-fade-in {
+  animation: bf-fade-in 0.4s ease both;
+}
+.bf-rise {
+  animation: bf-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.bf-stagger-1 { animation-delay: 0.04s; }
+.bf-stagger-2 { animation-delay: 0.08s; }
+.bf-stagger-3 { animation-delay: 0.12s; }
+.bf-stagger-4 { animation-delay: 0.16s; }
+.bf-stagger-5 { animation-delay: 0.20s; }
+.bf-stagger-6 { animation-delay: 0.24s; }
+
+/* Surface: consistent card elevation + interactive lift. */
+.bf-card {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: var(--radius-xl);
+  box-shadow:
+    0 1px 2px -1px rgba(15, 23, 42, 0.08),
+    0 1px 3px rgba(15, 23, 42, 0.04);
+}
+.bf-card-hover {
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+.bf-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklch, var(--primary) 45%, var(--border));
+  box-shadow:
+    0 4px 6px -2px rgba(15, 23, 42, 0.08),
+    0 12px 24px -8px color-mix(in oklch, var(--primary) 22%, transparent);
+}
+.dark .bf-card {
+  box-shadow:
+    0 1px 2px -1px rgba(0, 0, 0, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Skeleton shimmer — layered over a muted base block. */
+.bf-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--muted) 45%, var(--card));
+}
+.bf-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--foreground) 7%, transparent),
+    transparent
+  );
+  animation: bf-shimmer 1.6s infinite;
+}
+
+/* Faint gradient hairline divider between page sections. */
+.bf-divider {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--border) 90%, transparent),
+    transparent
+  );
+}
+
+/* Reusable gradient text (matches brand primary→accent). */
+.bf-gradient-text {
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-fade-in,
+  .bf-rise,
+  .bf-skeleton::after {
+    animation: none;
+  }
+  .bf-rise { opacity: 1; transform: none; }
 }
 
 /* Floating Math Watermarks */

@@ -7,8 +7,10 @@
  * Story: a delivery van has a fixed weight capacity and a set of packages, each
  * with a weight (kg) and a value (delivery priority / revenue). Which subset
  * maximizes value without exceeding capacity? That's 0/1 Knapsack. Reuses the
- * existing /knapsack backend, visualizes the DP table fill, shows which packages
- * the optimal plan loads, and contrasts it with a greedy value/weight heuristic.
+ * existing /knapsack backend and *plays back* the dynamic-programming table one
+ * package-row at a time — highlighting exactly which capacities each package
+ * improves — before revealing the optimal van load and contrasting it with a
+ * greedy value/weight heuristic.
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -19,9 +21,11 @@ import {
   AiExplanation,
   Challenge,
   Completion,
-  StepHint,
+  DecisionPanel,
+  StepPlayer,
+  useStepPlayer,
 } from '@/components/learn/experiential'
-import { Package, Truck, Weight, Sparkles, Boxes } from 'lucide-react'
+import { Package, Truck, Weight, Sparkles, Boxes, WifiOff, Check } from 'lucide-react'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -73,11 +77,28 @@ export default function AmazonLogisticsModule() {
       .finally(() => setLoading(false))
   }, [])
 
+  const matrix = res?.dp.dp_matrix ?? []
+  const player = useStepPlayer(Math.max(matrix.length, 1))
+  const row = player.idx // rows 0..n revealed; active row = player.idx
+  const finished = player.atEnd
+
   const selected = useMemo(() => new Set(res?.dp.selected_indices ?? []), [res])
   const loadedWeight = useMemo(
     () => ITEMS.filter((_, i) => selected.has(i)).reduce((s, it) => s + it.weight, 0),
     [selected],
   )
+
+  // Which capacities did the active package improve over "skip it"?
+  const improved = useMemo(() => {
+    if (row < 1 || !matrix[row] || !matrix[row - 1]) return new Set<number>()
+    const s = new Set<number>()
+    matrix[row].forEach((v, w) => {
+      if (v !== matrix[row - 1][w]) s.add(w)
+    })
+    return s
+  }, [matrix, row])
+
+  const activeItem = row >= 1 ? ITEMS[row - 1] : null
 
   return (
     <div className="max-w-5xl mx-auto p-6 md:p-8 space-y-6">
@@ -86,9 +107,16 @@ export default function AmazonLogisticsModule() {
         eyebrow="Fulfillment"
         title="Load the Delivery Van"
         algorithm="0/1 Knapsack (Dynamic Programming)"
-        blurb="A delivery van leaves the warehouse with a strict weight limit. Each package has a weight and a business value (priority × revenue). You can either load a package whole or leave it — no fractions. Choosing the highest-value subset that fits is the classic 0/1 Knapsack problem."
+        blurb="A delivery van leaves the warehouse with a strict weight limit. Each package has a weight and a business value (priority × revenue). You can load a package whole or leave it — no fractions. Choosing the highest-value subset that fits is the classic 0/1 Knapsack problem — and dynamic programming solves it exactly."
         icon={Truck}
         accent="from-amber-500/20"
+        problem={`The van holds only ${CAPACITY} kg, but there are more packages than will fit. Pick the subset with the greatest total value without exceeding the weight limit.`}
+        whyIndustry="Fulfillment centers, cargo airlines, and cloud schedulers all face knapsack-shaped choices — fit the most valuable work into a fixed resource. DP guarantees the optimal packing, which a fast greedy rule of thumb can silently miss."
+        facts={[
+          'A greedy “best value-per-kg first” loader is fast but can be provably worse than optimal.',
+          'The DP table has (packages + 1) × (capacity + 1) cells — each solved exactly once.',
+          'The same algorithm powers budget allocation, ad selection, and cloud bin-packing.',
+        ]}
       />
 
       <Section step={1} title="The real-world problem" subtitle="Capacity vs. value, one indivisible package at a time">
@@ -103,27 +131,48 @@ export default function AmazonLogisticsModule() {
 
       <Section step={2} title="The packages" subtitle="Optimal load computed by the real /knapsack backend">
         {loading ? (
-          <div className="h-40 rounded-xl border border-border bg-background/40 animate-pulse" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="bf-skeleton h-20 rounded-xl" />
+            ))}
+          </div>
         ) : err ? (
-          <p className="text-sm text-muted-foreground">Couldn&apos;t reach the knapsack service.</p>
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <WifiOff className="w-8 h-8 text-muted-foreground/50 mb-2" />
+            <p className="text-sm text-muted-foreground">Couldn&apos;t reach the knapsack service.</p>
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {ITEMS.map((it, i) => {
-                const inPlan = selected.has(i)
+                const inPlan = finished && selected.has(i)
+                const isActive = activeItem?.name === it.name
                 return (
                   <div
                     key={it.name}
-                    className={`rounded-xl border p-4 transition-all ${
-                      inPlan ? 'border-emerald-500/50 bg-emerald-500/10' : 'border-border bg-background/40 opacity-70'
+                    className={`rounded-xl border p-4 transition-all duration-300 ${
+                      inPlan
+                        ? 'border-emerald-500/50 bg-emerald-500/10'
+                        : isActive
+                        ? 'border-primary/50 bg-primary/10 ring-1 ring-primary/20'
+                        : 'border-border bg-background/40'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Package className={`w-4 h-4 ${inPlan ? 'text-emerald-400' : 'text-muted-foreground'}`} />
+                        <Package
+                          className={`w-4 h-4 ${inPlan ? 'text-emerald-500' : isActive ? 'text-primary' : 'text-muted-foreground'}`}
+                        />
                         <span className="font-semibold text-foreground">{it.name}</span>
                       </div>
-                      {inPlan && <span className="text-[10px] font-bold uppercase text-emerald-400">Loaded</span>}
+                      {inPlan && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-emerald-500">
+                          <Check className="w-3 h-3" /> Loaded
+                        </span>
+                      )}
+                      {!finished && isActive && (
+                        <span className="text-[10px] font-bold uppercase text-primary">Considering</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
@@ -138,15 +187,52 @@ export default function AmazonLogisticsModule() {
               })}
             </div>
 
+            {/* Van capacity gauge — fills once the optimal plan is known */}
+            {res && finished && (
+              <div className="bf-fade-in mt-4 rounded-xl border border-border bg-background/40 p-4">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="inline-flex items-center gap-2 font-semibold text-foreground">
+                    <Truck className="w-4 h-4 text-primary" /> Van loaded
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {loadedWeight} / {CAPACITY} kg
+                  </span>
+                </div>
+                <div className="flex h-6 w-full overflow-hidden rounded-lg bg-border/40 gap-0.5">
+                  {ITEMS.filter((_, i) => selected.has(i)).map((it) => (
+                    <div
+                      key={it.name}
+                      title={`${it.name} · ${it.weight}kg · value ${it.value}`}
+                      className="bg-emerald-500/70 flex items-center justify-center text-[10px] font-bold text-emerald-50 transition-all duration-500"
+                      style={{ width: `${(it.weight / CAPACITY) * 100}%` }}
+                    >
+                      {it.weight >= 2 ? it.name.split(' ')[0] : ''}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {res && (
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <SummaryTile icon={Boxes} label="Optimal value (DP)" value={res.dp.max_value} tone="text-emerald-400" />
-                <SummaryTile icon={Weight} label="Weight loaded" value={`${loadedWeight} / ${CAPACITY} kg`} tone="text-primary" />
+                <SummaryTile
+                  icon={Boxes}
+                  label="Optimal value (DP)"
+                  value={finished ? res.dp.max_value : matrix[row]?.[CAPACITY] ?? 0}
+                  tone="text-emerald-500"
+                  hint={finished ? 'provably best' : 'best so far'}
+                />
+                <SummaryTile
+                  icon={Weight}
+                  label="Weight loaded"
+                  value={finished ? `${loadedWeight} / ${CAPACITY} kg` : `— / ${CAPACITY} kg`}
+                  tone="text-primary"
+                />
                 <SummaryTile
                   icon={Sparkles}
                   label="Greedy heuristic"
                   value={res.greedy.max_value}
-                  tone="text-amber-400"
+                  tone="text-amber-500"
                   hint="value/weight order"
                 />
               </div>
@@ -155,56 +241,99 @@ export default function AmazonLogisticsModule() {
         )}
       </Section>
 
-      {res && (
-        <Section step={3} title="Inside the DP table" subtitle="Rows = packages considered · Columns = remaining capacity">
-          <StepHint>
-            Each cell answers: “using only the first <i>i</i> packages and a van of capacity <i>w</i>, what&apos;s the
-            best value?” Hover a cell — the highlighted row/column shows the sub-problem it solves. The bottom-right
-            cell is the answer: <b className="text-foreground">{res.dp.max_value}</b>.
-          </StepHint>
-          <div className="overflow-x-auto mt-4 custom-scrollbar">
-            <table className="border-collapse text-xs">
-              <thead>
-                <tr>
-                  <th className="p-1.5 text-muted-foreground font-medium sticky left-0 bg-card">item \ cap</th>
-                  {Array.from({ length: CAPACITY + 1 }, (_, w) => (
-                    <th key={w} className="p-1.5 text-center text-muted-foreground font-medium w-9">
-                      {w}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {res.dp.dp_matrix.map((row, i) => (
-                  <tr key={i}>
-                    <td className="p-1.5 text-right font-medium text-foreground/80 whitespace-nowrap sticky left-0 bg-card">
-                      {i === 0 ? '∅' : ITEMS[i - 1]?.name}
-                    </td>
-                    {row.map((cell, w) => {
-                      const isAnswer = i === res.dp.dp_matrix.length - 1 && w === CAPACITY
-                      const active =
-                        hoverCell && (hoverCell.i === i || hoverCell.w === w) && hoverCell.i >= i && hoverCell.w >= w
-                      return (
+      {res && !err && (
+        <Section step={3} title="Watch the DP table fill" subtitle="Rows = packages considered · Columns = van capacity remaining">
+          <div className="space-y-4">
+            <StepPlayer player={player} label="Package" />
+
+            <DecisionPanel
+              state={
+                row === 0 ? (
+                  <>Base case: with <b className="text-foreground">zero packages</b>, every capacity is worth 0.</>
+                ) : (
+                  <>
+                    Rows 0–{row} filled — the best value using the first <b className="text-foreground">{row}</b>{' '}
+                    package{row === 1 ? '' : 's'} for each capacity is now known.
+                  </>
+                )
+              }
+              decision={
+                activeItem ? (
+                  <>
+                    Consider <b className="text-foreground">{activeItem.name}</b> ({activeItem.weight}kg, value{' '}
+                    {activeItem.value}): for each capacity take{' '}
+                    <span className="text-primary font-medium">max(skip, load it)</span>.
+                  </>
+                ) : (
+                  <>Initialize the empty-knapsack row to all zeros.</>
+                )
+              }
+              reasoning={
+                activeItem ? (
+                  <>
+                    Loading it beat skipping in <b className="text-emerald-500">{improved.size}</b> capacit
+                    {improved.size === 1 ? 'y' : 'ies'} (highlighted). Best at cap {CAPACITY}:{' '}
+                    <b className="text-foreground">{matrix[row]?.[CAPACITY]}</b>.
+                  </>
+                ) : (
+                  <>Nothing to pack yet — this row anchors the recursion.</>
+                )
+              }
+            />
+
+            <div className="overflow-x-auto custom-scrollbar rounded-xl border border-border bg-background/40 p-2">
+              <table className="border-collapse text-xs">
+                <thead>
+                  <tr>
+                    <th className="p-1.5 text-muted-foreground font-medium sticky left-0 bg-card z-10">item \ cap</th>
+                    {Array.from({ length: CAPACITY + 1 }, (_, w) => (
+                      <th key={w} className="p-1.5 text-center text-muted-foreground font-medium w-9">
+                        {w}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {matrix.map((r, i) => {
+                    const revealed = i <= row
+                    const isActiveRow = i === row && row >= 1
+                    return (
+                      <tr key={i} className={isActiveRow ? 'bg-primary/5' : ''}>
                         <td
-                          key={w}
-                          onMouseEnter={() => setHoverCell({ i, w })}
-                          onMouseLeave={() => setHoverCell(null)}
-                          className={`p-1.5 text-center border border-border/40 transition-colors ${
-                            isAnswer
-                              ? 'bg-emerald-500/25 text-emerald-300 font-bold'
-                              : active
-                              ? 'bg-primary/15 text-foreground'
-                              : 'text-muted-foreground'
+                          className={`p-1.5 text-right font-medium whitespace-nowrap sticky left-0 bg-card z-10 ${
+                            revealed ? 'text-foreground/80' : 'text-muted-foreground/40'
                           }`}
                         >
-                          {cell}
+                          {i === 0 ? '∅' : ITEMS[i - 1]?.name}
                         </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        {r.map((cell, w) => {
+                          const isAnswer = finished && i === matrix.length - 1 && w === CAPACITY
+                          const isImproved = isActiveRow && improved.has(w)
+                          const isHover =
+                            hoverCell && (hoverCell.i === i || hoverCell.w === w) && hoverCell.i >= i && hoverCell.w >= w
+                          let cls = 'text-muted-foreground/30'
+                          if (isAnswer) cls = 'bg-emerald-500/25 text-emerald-500 font-bold'
+                          else if (isImproved) cls = 'bg-emerald-500/15 text-emerald-500 font-semibold'
+                          else if (isActiveRow) cls = 'text-foreground'
+                          else if (revealed && isHover) cls = 'bg-primary/15 text-foreground'
+                          else if (revealed) cls = 'text-muted-foreground'
+                          return (
+                            <td
+                              key={w}
+                              onMouseEnter={() => revealed && setHoverCell({ i, w })}
+                              onMouseLeave={() => setHoverCell(null)}
+                              className={`p-1.5 text-center border border-border/40 transition-colors duration-200 ${cls}`}
+                            >
+                              {revealed ? cell : '·'}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </Section>
       )}
@@ -217,7 +346,7 @@ export default function AmazonLogisticsModule() {
         />
       </Section>
 
-      <Section step={5} title="Your challenge" subtitle="Reason about the trade-off">
+      <Section step={5} title="Your challenge" subtitle="Predict the optimal packing">
         <Challenge
           topic="knapsack"
           spec={{
@@ -237,7 +366,7 @@ export default function AmazonLogisticsModule() {
         />
       </Section>
 
-      <Completion topic="knapsack" score={100} visible={solved} />
+      <Completion topic="knapsack" title="0/1 Knapsack" score={100} visible={solved} />
     </div>
   )
 }
@@ -261,7 +390,7 @@ function SummaryTile({
         <Icon className={`w-4 h-4 ${tone}`} />
         <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</span>
       </div>
-      <p className={`text-2xl font-bold mt-1 ${tone}`}>{value}</p>
+      <p className={`text-2xl font-bold mt-1 tabular-nums ${tone}`}>{value}</p>
       {hint && <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>}
     </div>
   )
